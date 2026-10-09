@@ -9,9 +9,10 @@ These links are private claude.ai pages that coding agents cannot open. Everythi
 
 - Repo created, `uv init` done, dependencies installed, Chromium installed, context files committed.
 - SDK verified on subscription login; isolation settings proven by `scripts/check_sdk.py` (merged to `main`, PR #1).
-- Keyword matcher and fixtures done on branch `feat/test-listings` (PR pending).
-- Browser Use CLI spike done on branch `spike/browser-use-cli` (PR pending); design documented in `AGENTS.md`.
-- **Next step:** Demo 1, database schema (listings, decisions, runs).
+- Keyword matcher and fixtures merged to `main` (PR #2).
+- Browser Use CLI spike merged to `main` (PR #3); design documented in `AGENTS.md`.
+- Database schema done on branch `feat/database-schema` (PR pending): `db/tables.py`, `db/queries.py`, tests in `tests/test_db.py`.
+- **Next step:** Navigation, starting with the navigator interface + guards + session handling. Email is deferred until collection and extraction work.
 
 ## How we work
 
@@ -58,7 +59,7 @@ These links are private claude.ai pages that coding agents cannot open. Everythi
 
 ### Demo 1: keyword matching
 - [x] Test data: 13 synthetic fixture listings in `tests/fixtures/listings.yaml` (real labeled set comes later from the navigator)
-- [ ] Database schema (listings, decisions, runs)
+- [x] Database schema (listings, decisions, runs)
 - [x] Keyword matcher (whole-word, case-insensitive, phrases, matched-keyword snippets)
 - [ ] Email report template and sending
 
@@ -101,6 +102,7 @@ These links are private claude.ai pages that coding agents cannot open. Everythi
 | 2026-10-09 | Keyword rules: phrase words may be separated by any whitespace; overlapping keywords (Microsoft / Microsoft Dynamics) are both reported; "Robotic Process Automation (RPA)" split into two keywords |
 | 2026-10-09 | DOM stream uses the Browser Use CLI (pinned 0.13.11, separate `uv tool`) attached to a Playwright-launched dedicated browser over CDP; agent's only tool is a validated `browser(code)`, no Bash. The CLI runs arbitrary Python as the user, so the code filter is best effort; browser-level guards (non-GET block, URL allowlist) and OS isolation are the firm limits. Telemetry/update checks off; login done by our code. Proven by `spike/browser-use-cli` |
 | 2026-10-09 | Runtime agents: `setting_sources=[]`, `strict-mcp-config` + `ENABLE_CLAUDEAI_MCP_SERVERS=false` (claude.ai connectors like Gmail otherwise attach), cwd in a temp dir. Built-in skills/plugins still appear; they ship with the CLI |
+| 2026-10-09 | Schema: `listings` unique on (site, job_id); `decisions` are separate rows per matcher so keywords and Jev can be compared on the same listing; `matched = NULL` means unscored, never a non-match; `fields` and `details` are JSON columns so they can grow without migrations |
 
 ## Branching
 

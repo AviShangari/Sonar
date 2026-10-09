@@ -1,0 +1,13 @@
+# Source registry. One entry per bidding site. No selectors: the navigation agent
+# works out each site's layout itself.
+#   name:           short key, stored with every listing
+#   start_url:      the page that lists opportunities (query string kept as given)
+#   allowed_hosts:  the browser may only navigate to these hosts (guard)
+#   hint:           optional plain-English tip for the agent
+#   requires_login: login is done by our code, never the agent
+sites:
+  - name: canadabuys
+    start_url: "https://canadabuys.canada.ca/en/tender-opportunities?status%5B0%5D=87&current_tab=t&record_per_page=50"
+    allowed_hosts: ["canadabuys.canada.ca"]
+    hint: "Search results of open tender opportunities; each result links to its own tender notice page."
+    requires_login: false

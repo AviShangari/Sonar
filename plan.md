@@ -12,7 +12,8 @@ These links are private claude.ai pages that coding agents cannot open. Everythi
 - Keyword matcher and fixtures merged to `main` (PR #2).
 - Browser Use CLI spike merged to `main` (PR #3); design documented in `AGENTS.md`.
 - Database schema done on branch `feat/database-schema` (PR pending): `db/tables.py`, `db/queries.py`, tests in `tests/test_db.py`.
-- **Next step:** Navigation, starting with the navigator interface + guards + session handling. Email is deferred until collection and extraction work.
+- Navigator base done on branch `feat/navigator-base` (PR pending): `sites.yaml`, `navigation/{base,guards,urls,session}.py`, `scripts/check_site.py`. Email is deferred until collection and extraction work.
+- **Next step:** DOM stream on CanadaBuys: agent collects result links from the list page; code dedups, extracts and stores.
 
 ## How we work
 
@@ -70,7 +71,7 @@ These links are private claude.ai pages that coding agents cannot open. Everythi
 - [ ] Compare keyword vs Jev: precision and recall
 
 ### Navigation
-- [ ] Navigator interface + guards + session handling
+- [x] Navigator interface + guards + session handling
 - [ ] DOM stream on one site
 - [ ] Vision stream on the same site
 - [ ] Compare streams: listings found, duplicate clicks, misclicks, time and cost per listing

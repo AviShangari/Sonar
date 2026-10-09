@@ -15,7 +15,7 @@ def load_keywords(path: Path) -> list[str]:
     return [str(k).strip() for k in data["keywords"] if str(k).strip()]
 
 
-def _compile(keyword: str) -> re.Pattern[str]:
+def compile_keyword(keyword: str) -> re.Pattern[str]:
     # Words of a phrase may be separated by any whitespace (web text has line breaks).
     body = r"\s+".join(re.escape(word) for word in keyword.split())
     # (?<!\w) / (?!\w): the match may not touch another letter or digit, so "SAP" misses "saplings".
@@ -31,7 +31,7 @@ def _snippet(text: str, start: int, end: int) -> str:
 
 class KeywordMatcher:
     def __init__(self, keywords: list[str]) -> None:
-        self._patterns = [(keyword, _compile(keyword)) for keyword in keywords]
+        self._patterns = [(keyword, compile_keyword(keyword)) for keyword in keywords]
 
     def match(self, text: str) -> MatchResult:
         hits: list[KeywordHit] = []

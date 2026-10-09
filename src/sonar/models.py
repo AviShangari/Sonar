@@ -59,3 +59,28 @@ class RunLog(BaseModel):
     finished_at: datetime | None = None
     status: str  # "running", "ok", "partial" (some sites failed) or "failed"
     notes: str | None = None
+
+
+class ReportMatch(BaseModel):
+    """One matched listing as shown in the report."""
+
+    title: str
+    url: str
+    site: str
+    job_id: str
+    listed_date: str | None = None  # date on the site's result list
+    posted_date: str | None = None  # date in the posting itself
+    hits: list[KeywordHit]
+
+
+class Report(BaseModel):
+    """Everything the report shows for one run. Built from the database, rendered to HTML and text."""
+
+    run_id: int
+    status: str  # "ok", "partial" or "failed"
+    started_at: str
+    failed_sites: str | None = None  # the run's notes when sites failed
+    new_postings: int  # stored during this run
+    scored: int  # listings the matcher decided during this run
+    matcher: str
+    matches: list[ReportMatch]  # ranked, best first

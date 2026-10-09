@@ -1,0 +1,91 @@
+# Fake listings for testing the keyword matcher. NOT real data.
+# Each entry says which keywords (from config/keywords.yaml) the matcher must find.
+# `expected` is the exact set of keywords, spelled as in keywords.yaml. [] means no match.
+listings:
+  - id: single-word
+    why: A plain single-word keyword is found.
+    title: SAP support for finance team
+    text: The department requires SAP consultants to support month-end reporting.
+    expected: [SAP]
+
+  - id: phrase
+    why: A multi-word keyword is found as a phrase.
+    title: HR system rollout support
+    text: Provide change management services for the new HR system rollout.
+    expected: [change management]
+
+  - id: case-insensitive
+    why: Capitalization does not matter.
+    title: Database and platform admins
+    text: ORACLE database administrators wanted, plus a servicenow platform owner.
+    expected: [Oracle, ServiceNow]
+
+  - id: near-miss-words
+    why: Keywords inside longer words must NOT match (saplings, Workdays).
+    title: Park landscaping supplies
+    text: Supply of saplings and mulch for city parks. Workdays are Monday to Friday.
+    expected: []
+
+  - id: scattered-phrase-words
+    why: The words of a phrase appearing apart, or out of order, must NOT match.
+    title: Office reorganization review
+    text: The management of this project requires a change in management structure.
+    expected: []
+
+  - id: many-keywords
+    why: Several keywords in one listing are all reported, including overlapping ones.
+    title: Enterprise modernization program
+    text: >-
+      Deliver Microsoft Dynamics 365 and SAP integration as part of a Business
+      Transformation program, with Project Management, RPA bots and business
+      intelligence dashboards.
+    expected:
+      - Microsoft
+      - Microsoft Dynamics
+      - SAP
+      - Business Transformation
+      - Project Management
+      - RPA
+      - Business intelligence
+
+  - id: no-keywords
+    why: A listing with nothing relevant gives no match.
+    title: Janitorial services
+    text: Daily cleaning of office space, including washrooms and common areas.
+    expected: []
+
+  - id: brackets
+    why: A keyword next to brackets is found (each name matches separately).
+    title: Automation pilot
+    text: Build Robotic Process Automation (RPA) bots for invoice processing.
+    expected: [Robotic Process Automation, RPA]
+
+  - id: exact-phrase-capitalized
+    why: A phrase in title case still matches.
+    title: Standing offer
+    text: Supply of IT Professional Services under a standing offer.
+    expected: [IT Professional Services]
+
+  - id: ms-dynamics-abbreviation
+    why: The abbreviation MS Dynamics matches on its own, without Microsoft.
+    title: CRM developer
+    text: Experience with MS Dynamics CRM is required.
+    expected: [MS Dynamics]
+
+  - id: punctuation-boundaries
+    why: Keywords next to commas, semicolons and hyphens still match as whole words.
+    title: Legacy migration
+    text: Migrate from PeopleSoft to Workday; Oracle-based reports must be rebuilt.
+    expected: [Peoplesoft, Workday, Oracle]
+
+  - id: messy-whitespace
+    why: Web text has line breaks and double spaces; phrases must still match.
+    title: Messy copy
+    text: "Lead change\nmanagement and Business  intelligence reporting."
+    expected: [change management, Business intelligence]
+
+  - id: repeated-keyword
+    why: A keyword appearing three times is still one matched keyword.
+    title: SAP everywhere
+    text: SAP is used here. We run SAP for finance and sap for HR.
+    expected: [SAP]

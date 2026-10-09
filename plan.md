@@ -16,8 +16,10 @@ These links are private claude.ai pages that coding agents cannot open. Everythi
 - First real site: CanadaBuys (see `config/sites.yaml`). Email report is deferred until collection and extraction work.
 - DOM navigator built on `feat/dom-navigator` (not yet merged): `agent_runner.py`, `navigation/dom.py`, `extraction/posting.py`, `scripts/run_dom_navigator.py`, tests in `tests/test_dom_navigator.py`. Live on CanadaBuys: the agent reads the list (50 rows with dates), clicks "load more" when code asks, and code stops at the first row dated before the cutoff (newest stored `listed_date`, or today minus `first_run_days` on an empty database). New postings are opened, extracted and stored; known IDs are skipped unopened.
 - **Not yet built in the DOM stream:** the title + client + date fallback ID, concurrent workers, screenshot on failure, retry of a failed posting, headless mode on CanadaBuys (it returns 403, see Open questions). `--limit` in the live script is only a test cap: a capped run still moves the cutoff to the newest stored date, so older unseen postings would be skipped on the next run. Do not use `--limit` for real runs.
-- `feat/extraction-cleanup` built (not yet merged): on the 13 stored CanadaBuys postings 35 boilerplate lines are found and a posting shrinks from 2,852 to 1,041 characters. The matcher is not wired to the cleaned text yet; whoever connects matching must call `find_boilerplate` / `strip_boilerplate` first. Postings stored before this change have no `posted_date`.
-- **Next step:** merge `feat/extraction-cleanup`, then the vision stream or the email report (priority to be confirmed).
+- Extraction cleanup merged (PR #8): generic boilerplate stripping, `posted_date`, stale-run cleanup.
+- `feat/pipeline-matching` built (not yet merged): `python -m sonar.main` runs navigate, dedup, store, then keyword matching on cleaned text and stores a `decisions` row per listing. New: `config/settings.yaml` + `config.py`, `pipeline.py`, `main.py`, `navigation/factory.py`, `matching/{factory,run}.py`. Live run: 4 new stored, 13 known, 17 scored, 2 matches. Matching raw text would have flagged 16 of 17 (SAP appears in CanadaBuys boilerplate), so cleaning is essential.
+- Keyword-in-boilerplate warnings are logged each run (CanadaBuys: the 'register in SAP Ariba' help sentence, found in 16 of 17 postings, is the one stripped line with a keyword). Known weak spot: one match ("SAP Business Network event") is the SAP platform named in tender instructions, not an SAP project. Keywords alone cannot tell the difference; this is the kind of case Jev should separate in demo 2.
+- **Next step:** merge `feat/pipeline-matching`, then `feat/email-report` (vision stream on hold by the developer's choice).
 
 ## How we work
 
@@ -66,6 +68,7 @@ These links are private claude.ai pages that coding agents cannot open. Everythi
 - [x] Test data: 13 synthetic fixture listings in `tests/fixtures/listings.yaml` (real labeled set comes later from the navigator)
 - [x] Database schema (listings, decisions, runs)
 - [x] Keyword matcher (whole-word, case-insensitive, phrases, matched-keyword snippets)
+- [x] Pipeline wiring: one run stores postings and keyword decisions (`python -m sonar.main`)
 - [ ] Email report template and sending
 
 ### Demo 2: Jev matching
@@ -78,7 +81,7 @@ These links are private claude.ai pages that coding agents cannot open. Everythi
 - [x] Navigator interface + guards + session handling
 - [x] DOM stream on one site (CanadaBuys, first page only; see "Not yet built" above)
 - [x] DOM stream: pagination with an early stop by posted date (list-row date stored in `fields.listed_date`; code decides, agent only reads rows and clicks "load more")
-- [x] Extraction cleanup: generic boilerplate stripping (`extraction/boilerplate.py`: lines in at least 90% of a site's postings, needs 5+ postings; full text stays stored, cleaned text computed on read), posting's own `posted_date` in `fields`, stale `running` runs marked failed (`fail_stale_runs`, 2 hours)
+- [x] Extraction cleanup: generic boilerplate stripping (`extraction/boilerplate.py`: lines in at least 90% of a site's postings, needs 15+ postings; full text stays stored, cleaned text computed on read), posting's own `posted_date` in `fields`, stale `running` runs marked failed (`fail_stale_runs`, 2 hours)
 - [ ] Vision stream on the same site
 - [ ] Compare streams: listings found, duplicate clicks, misclicks, time and cost per listing
 
@@ -124,7 +127,10 @@ These links are private claude.ai pages that coding agents cannot open. Everythi
 | 2026-10-09 | The agent prompt includes a worked reading recipe, kept as code in `dom.py` and checked by a test against `code_check`, so the prompt cannot teach code the filter rejects. Without it the agent used 7+ calls and missed the all-caps "LOAD ..." link |
 | 2026-10-09 | Cutoff stays the newest stored site date (`fields.listed_date`), not our own `first_seen_at`: the stop rule must compare against the dates shown on the list page, and a late first run or capped run would move a found-date cutoff past unseen postings. Considered and deferred: cutoff = earliest site date of the last fully completed run (uses `runs.status`), so a capped or failed run cannot advance it. Revisit before real scheduled runs |
 | 2026-10-09 | Boilerplate in stored text is removed by a generic cross-posting rule (lines found in nearly all of a site's postings), not per-site selectors; raw HTML stays untouched. Done right after the DOM navigator merges |
-| 2026-10-09 | Boilerplate settings: a line is boilerplate at 90% of a site's postings, and only when the site has 5+ stored postings (below that nothing is stripped). Raw `posting_text` is never modified; matching reads the cleaned view. Two dates are kept per listing: `listed_date` (list row, drives the stop rule) and `posted_date` (read from the posting's own text, generic regex). Runs still `running` after 2 hours are marked failed at the next run start; a stopped script (including Ctrl+C) marks its own run failed |
+| 2026-10-09 | Boilerplate settings: a line is boilerplate at 90% of a site's postings, and only when the site has 15+ stored postings (below that nothing is stripped; raised from 5, see the next row). Raw `posting_text` is never modified; matching reads the cleaned view. Two dates are kept per listing: `listed_date` (list row, drives the stop rule) and `posted_date` (read from the posting's own text, generic regex). Runs still `running` after 2 hours are marked failed at the next run start; a stopped script (including Ctrl+C) marks its own run failed |
+| 2026-10-09 | Matching runs AFTER all of a site's new postings are stored, on every listing that has no decision from the current matcher (not only this run's). So boilerplate is measured on the freshest data, a first run works, a crash between storing and matching is finished by the next run, and a new matcher scores old listings. Runs end `ok`, `partial` (some sites failed) or `failed`, with failed sites listed in `runs.notes` for the report. Matchers and navigators are chosen by `config/settings.yaml` through two factories (`matching/factory.py`, `navigation/factory.py`) |
+| 2026-10-09 | Guarding against lost keywords: stripping needs 15+ stored postings per site (was 5), so a small or lopsided sample cannot hide real content; early on we accept extra matches over lost ones. Every run also logs a WARNING for each stripped boilerplate line that contains a client keyword (keyword, how many postings, the line) so a human can confirm it really is boilerplate. Not done: letting the report show these warnings, and a way to exclude a line from stripping; add both if a real keyword is ever hidden |
+| 2026-10-09 | Priority: vision stream on hold; email report next |
 
 ## Notes for agents on this machine (Windows)
 

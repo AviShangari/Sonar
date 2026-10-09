@@ -27,7 +27,7 @@ See `plan.md` for the build order, current status and decision log.
 uv sync                              # install dependencies
 uv run playwright install chromium   # install the browser
 uv run pytest                        # run tests
-uv run python -m sonar.main          # run the pipeline (see config/settings.yaml)
+uv run python -m sonar.main          # run the pipeline (see config/settings.yaml); --site, --days, --max-new (test cap)
 uv tool install browser-use==0.13.11 --python 3.12   # one-time: the browser CLI (pinned; never install from git main)
 ```
 

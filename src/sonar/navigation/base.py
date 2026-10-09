@@ -1,6 +1,7 @@
 """The navigator interface. Nothing outside navigation/ may know which mode is running."""
 
 from dataclasses import dataclass
+from datetime import date
 from typing import Protocol
 
 from playwright.async_api import Page
@@ -13,6 +14,7 @@ class OpenedListing:
     job_id: str | None  # None: no ID in the URL; caller falls back to title + client + date
     url: str  # normalized (no query string or fragment)
     page: Page
+    listed_date: date | None = None  # date shown in the site's result list, if any
 
 
 class Navigator(Protocol):

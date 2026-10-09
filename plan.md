@@ -14,7 +14,9 @@ These links are private claude.ai pages that coding agents cannot open. Everythi
 - Database schema merged to `main` (PR #4): `db/tables.py`, `db/queries.py`, tests in `tests/test_db.py`.
 - Navigator base merged to `main`: `config/sites.yaml`, `sites.py`, `navigation/{base,guards,urls,session}.py`, `scripts/check_site.py`. `base.py` is only the interface; no navigator implements it yet. Login and session-expiry handling are not built (CanadaBuys needs no login).
 - First real site: CanadaBuys (see `config/sites.yaml`). Email report is deferred until collection and extraction work.
-- **Next step:** DOM stream on CanadaBuys: agent collects result links from the list page; code dedups, extracts and stores.
+- DOM navigator built on `feat/dom-navigator` (not yet merged): `agent_runner.py`, `navigation/dom.py`, `extraction/posting.py`, `scripts/run_dom_navigator.py`, tests in `tests/test_dom_navigator.py`. Live on CanadaBuys: the agent reads the list (50 rows with dates), clicks "load more" when code asks, and code stops at the first row dated before the cutoff (newest stored `listed_date`, or today minus `first_run_days` on an empty database). New postings are opened, extracted and stored; known IDs are skipped unopened.
+- **Not yet built in the DOM stream:** the title + client + date fallback ID, concurrent workers, screenshot on failure, retry of a failed posting, headless mode on CanadaBuys (it returns 403, see Open questions). `--limit` in the live script is only a test cap: a capped run still moves the cutoff to the newest stored date, so older unseen postings would be skipped on the next run. Do not use `--limit` for real runs.
+- **Next step:** review/merge `feat/dom-navigator`, then `feat/extraction-cleanup` (boilerplate trimming, posting publication date, mark crashed runs as failed), then the vision stream or the email report (priority to be confirmed).
 
 ## How we work
 
@@ -73,7 +75,9 @@ These links are private claude.ai pages that coding agents cannot open. Everythi
 
 ### Navigation
 - [x] Navigator interface + guards + session handling
-- [ ] DOM stream on one site
+- [x] DOM stream on one site (CanadaBuys, first page only; see "Not yet built" above)
+- [x] DOM stream: pagination with an early stop by posted date (list-row date stored in `fields.listed_date`; code decides, agent only reads rows and clicks "load more")
+- [ ] Extraction: strip site-wide boilerplate (banner, menus, footer) from `posting_text`, generically and without per-site selectors: drop lines that appear in nearly all stored postings of a site. Keep the raw HTML untouched. Reason: CanadaBuys has no main-content element, so the whole body is stored, and a banner such as "Buy Canadian Policy" would cause false keyword matches. Also extract the posting's own publication date. Own branch (`feat/extraction-cleanup`), right after `feat/dom-navigator` merges
 - [ ] Vision stream on the same site
 - [ ] Compare streams: listings found, duplicate clicks, misclicks, time and cost per listing
 
@@ -109,6 +113,16 @@ These links are private claude.ai pages that coding agents cannot open. Everythi
 | 2026-10-09 | Navigation is generic: the agent works out each site's layout itself. `sites.yaml` holds only name, start URL, allowed hosts, optional hint, login flag. No per-site selectors. Extraction and the job-ID rule (`urls.job_id_from_url`, fallback title + client + posted date) are generic code |
 | 2026-10-09 | First site is CanadaBuys with a status/50-per-page filtered URL. Finding: a generic "ID-like link" rule also catches links outside the results list (award notices on the earlier URL; 52 ID-like links vs 50 results on the current one), so the agent must choose the result links |
 | 2026-10-09 | The guard blocks a harmless ad-tracker frame (demdex.net) on CanadaBuys; expected, no action |
+| 2026-10-09 | DOM agent only returns links: its final answer is JSON `{"links":[{title,url}]}`, treated as untrusted (http(s) only, allowed hosts only, normalized, deduped). Our code opens each posting in a new tab, so the agent never touches posting text. Zero usable links raises an error (not a quiet day) |
+| 2026-10-09 | The `browser(code)` tool lives inside `agent_runner.py` (the only SDK/CLI place), so `navigation/tools.py` from the layout is not needed |
+| 2026-10-09 | Real job IDs on CanadaBuys look like `cb-428-37324676` and `ws5897300910-doc5897312809` (last path segment); the generic rule works. The guard also blocks CanadaBuys' POST download counters on posting pages; harmless |
+| 2026-10-09 | Async tests use `asyncio.run` inside plain tests; no `pytest-asyncio` dependency added |
+| 2026-10-09 | Collection should stop by reaching already-stored postings, not by a fixed count. Safer than one anchor posting: stop at a posted date older than our newest stored one (decided: use dates), since a single anchor posting may close or be removed; fall back to N seen IDs in a row if a list page shows no date. Needs newest-first sorting. Planned under Navigation |
+| 2026-10-09 | Stop rule built: cutoff = newest stored `fields.listed_date` for the site, else today minus `first_run_days`. Rows on the cutoff day are kept (dedup skips known ones); the first older row ends collection. Dates come from the list row (CanadaBuys shows the open/amendment date, day only, sorted newest first with `order=pub_ifnot_amended&sort=desc`). A list that is not newest first is an error; with no dates at all, collection stops at a page of only known IDs; `max_list_pages` (default 10) caps "load more" steps |
+| 2026-10-09 | CanadaBuys paging is a "load more" link that appends rows to the same page; opening its URL directly returns 403, so the agent must click it. The code asks for one step at a time (open and read, or click once and return rows after the first N) |
+| 2026-10-09 | The agent prompt includes a worked reading recipe, kept as code in `dom.py` and checked by a test against `code_check`, so the prompt cannot teach code the filter rejects. Without it the agent used 7+ calls and missed the all-caps "LOAD ..." link |
+| 2026-10-09 | Cutoff stays the newest stored site date (`fields.listed_date`), not our own `first_seen_at`: the stop rule must compare against the dates shown on the list page, and a late first run or capped run would move a found-date cutoff past unseen postings. Considered and deferred: cutoff = earliest site date of the last fully completed run (uses `runs.status`), so a capped or failed run cannot advance it. Revisit before real scheduled runs |
+| 2026-10-09 | Boilerplate in stored text is removed by a generic cross-posting rule (lines found in nearly all of a site's postings), not per-site selectors; raw HTML stays untouched. Done right after the DOM navigator merges |
 
 ## Notes for agents on this machine (Windows)
 
@@ -126,6 +140,8 @@ These links are private claude.ai pages that coding agents cannot open. Everythi
 
 ## Open questions
 
+- [ ] Before real scheduled runs: make the cutoff safe against capped or failed runs (earliest site date of the last completed run); see decision log
+- [ ] CanadaBuys returns 403 to headless Chromium (headed works). Daily runs are meant to be headless on the VM: try Chromium's new headless mode / a normal user agent, or run headed under a virtual display
 - [ ] Azure VM confirmed?
 - [ ] Approved LLM provider for production (Anthropic API, Microsoft Foundry, other)?
 - [ ] Email: Microsoft Graph or SMTP? Recipients and frequency?

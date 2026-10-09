@@ -11,8 +11,9 @@ These links are private claude.ai pages that coding agents cannot open. Everythi
 - SDK verified on subscription login; isolation settings proven by `scripts/check_sdk.py` (merged to `main`, PR #1).
 - Keyword matcher and fixtures merged to `main` (PR #2).
 - Browser Use CLI spike merged to `main` (PR #3); design documented in `AGENTS.md`.
-- Database schema done on branch `feat/database-schema` (PR pending): `db/tables.py`, `db/queries.py`, tests in `tests/test_db.py`.
-- Navigator base done on branch `feat/navigator-base` (PR pending): `sites.yaml`, `navigation/{base,guards,urls,session}.py`, `scripts/check_site.py`. Email is deferred until collection and extraction work.
+- Database schema merged to `main` (PR #4): `db/tables.py`, `db/queries.py`, tests in `tests/test_db.py`.
+- Navigator base merged to `main`: `config/sites.yaml`, `sites.py`, `navigation/{base,guards,urls,session}.py`, `scripts/check_site.py`. `base.py` is only the interface; no navigator implements it yet. Login and session-expiry handling are not built (CanadaBuys needs no login).
+- First real site: CanadaBuys (see `config/sites.yaml`). Email report is deferred until collection and extraction work.
 - **Next step:** DOM stream on CanadaBuys: agent collects result links from the list page; code dedups, extracts and stores.
 
 ## How we work
@@ -104,6 +105,16 @@ These links are private claude.ai pages that coding agents cannot open. Everythi
 | 2026-10-09 | DOM stream uses the Browser Use CLI (pinned 0.13.11, separate `uv tool`) attached to a Playwright-launched dedicated browser over CDP; agent's only tool is a validated `browser(code)`, no Bash. The CLI runs arbitrary Python as the user, so the code filter is best effort; browser-level guards (non-GET block, URL allowlist) and OS isolation are the firm limits. Telemetry/update checks off; login done by our code. Proven by `spike/browser-use-cli` |
 | 2026-10-09 | Runtime agents: `setting_sources=[]`, `strict-mcp-config` + `ENABLE_CLAUDEAI_MCP_SERVERS=false` (claude.ai connectors like Gmail otherwise attach), cwd in a temp dir. Built-in skills/plugins still appear; they ship with the CLI |
 | 2026-10-09 | Schema: `listings` unique on (site, job_id); `decisions` are separate rows per matcher so keywords and Jev can be compared on the same listing; `matched = NULL` means unscored, never a non-match; `fields` and `details` are JSON columns so they can grow without migrations |
+| 2026-10-09 | Priority change: navigation and extraction before the email report; email deferred |
+| 2026-10-09 | Navigation is generic: the agent works out each site's layout itself. `sites.yaml` holds only name, start URL, allowed hosts, optional hint, login flag. No per-site selectors. Extraction and the job-ID rule (`urls.job_id_from_url`, fallback title + client + posted date) are generic code |
+| 2026-10-09 | First site is CanadaBuys with a status/50-per-page filtered URL. Finding: a generic "ID-like link" rule also catches links outside the results list (award notices on the earlier URL; 52 ID-like links vs 50 results on the current one), so the agent must choose the result links |
+| 2026-10-09 | The guard blocks a harmless ad-tracker frame (demdex.net) on CanadaBuys; expected, no action |
+
+## Notes for agents on this machine (Windows)
+
+- `uv` and `gh` are not on PATH. Run Python with `.\.venv\Scripts\python.exe`; for scripts set `$env:PYTHONPATH="src"` first.
+- Long bash heredocs failed to parse; create files with the Write/Edit tools.
+- The developer merges PRs on GitHub themselves. Commit and push only when asked.
 
 ## Branching
 

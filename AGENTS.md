@@ -117,6 +117,7 @@ Development uses the developer's Claude subscription login. API key support (and
 - Create a branch per build step (`feat/...`, `fix/...`, `docs/...`) from an up-to-date `main`. Never commit directly to `main`.
 - Ask before adding dependencies or changing the architecture.
 - When a step is done: tick it off in `plan.md`, update "Current status", and add any new decision to the decision log.
+- Keep `plan.md` current at all times: update it immediately whenever something changes (a PR merges, a decision is made, scope or priority shifts, a finding changes the design) and at the end of every phase. Do not leave it for later or for the end of the session.
 
 ## Conventions
 

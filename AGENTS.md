@@ -99,6 +99,14 @@ The Agent SDK can load `CLAUDE.md`, skills and settings from the project's `.cla
 
 Development uses the developer's Claude subscription login. API key support (and possibly Microsoft Foundry) must be added in `llm.py` before deployment or any scheduled run. Never hardcode auth anywhere else.
 
+## Workflow
+
+- Read `plan.md` at the start of every session; it holds current status, build order and decisions.
+- One build step at a time. Explain choices briefly; the developer is learning agent building.
+- Create a branch per build step (`feat/...`, `fix/...`, `docs/...`) from an up-to-date `main`. Never commit directly to `main`.
+- Ask before adding dependencies or changing the architecture.
+- When a step is done: tick it off in `plan.md`, update "Current status", and add any new decision to the decision log.
+
 ## Conventions
 
 - Type hints everywhere; Pydantic models for anything crossing a module boundary.

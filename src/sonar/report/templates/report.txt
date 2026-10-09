@@ -1,0 +1,29 @@
+SONAR REPORT
+{{ "=" * width }}
+Run {{ report.run_id }}  |  {{ report.started_at }}  |  matcher: {{ report.matcher }}
+
+{% if report.failed_sites %}
+!! {{ "SOME SITES COULD NOT BE CHECKED" if report.status == "partial" else "THIS RUN FAILED" }}
+{{ report.failed_sites|wrap("   ") }}
+
+{% endif %}
+{{ report.matches|length }} {{ "match" if report.matches|length == 1 else "matches" }}  |  {{ report.new_postings }} new postings found  |  {{ report.scored }} postings checked
+{{ "-" * width }}
+{% for m in report.matches %}
+
+{{ loop.index }}. {{ m.title }}
+   {{ m.site }}{% if m.posted_date %} | posted {{ m.posted_date }}{% elif m.listed_date %} | listed {{ m.listed_date }}{% endif %}
+
+   Keywords: {% for hit in m.hits %}{{ hit.keyword }}{% if hit.count > 1 %} (x{{ hit.count }}){% endif %}{{ ", " if not loop.last }}{% endfor %}
+
+{% for hit in m.hits[:2] %}
+{{ ('"' ~ hit.snippet ~ '"')|wrap("   > ") }}
+{% endfor %}
+   {{ m.url }}
+{% else %}
+
+No new postings matched your keywords in this run.
+{% endfor %}
+
+{{ "-" * width }}
+{{ "Matches are ranked by how many different keywords they contain, then by total mentions. Text shared by nearly all postings on a site (banners, menus) is ignored. Each entry shows the first two keyword snippets."|wrap("") }}

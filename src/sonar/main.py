@@ -1,7 +1,7 @@
 """Entry point:  python -m sonar.main [--site NAME] [--days N] [--max-new N]
 
 Runs the pipeline for every site in config/sites.yaml and prints what matched.
-(The email report is not built yet.)
+Writes the run's report (.html and .txt) to the report folder. Sending it is not built yet.
 """
 
 import argparse
@@ -15,6 +15,8 @@ from sonar.db.queries import fail_stale_runs, finish_run, start_run
 from sonar.db.tables import make_engine
 from sonar.matching.factory import build_matcher
 from sonar.pipeline import SiteOutcome, run_site
+from sonar.report.build import build_report
+from sonar.report.render import write_report
 from sonar.sites import load_sites
 
 
@@ -49,6 +51,8 @@ async def run(site_name: str | None, days: int | None, max_new: int | None) -> i
     status = run_status(outcomes)
     finish_run(engine, run_id, status, notes)
     print_summary(run_id, status, outcomes)
+    for path in write_report(build_report(engine, run_id, settings.matcher), settings.report_path):
+        print(f"report written: {path}")
     return 0 if status == "ok" else 1
 
 

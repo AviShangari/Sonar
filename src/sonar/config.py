@@ -17,6 +17,11 @@ class Settings(BaseModel):
     keywords_file: str = "config/keywords.yaml"
     headless: bool = False
     cdp_port: int = 9333
+    report_dir: str = "data/reports"
+
+    @property
+    def report_path(self) -> Path:
+        return ROOT / self.report_dir
 
     @property
     def keywords_path(self) -> Path:

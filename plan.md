@@ -19,7 +19,9 @@ These links are private claude.ai pages that coding agents cannot open. Everythi
 - Extraction cleanup merged (PR #8): generic boilerplate stripping, `posted_date`, stale-run cleanup.
 - `feat/pipeline-matching` built (not yet merged): `python -m sonar.main` runs navigate, dedup, store, then keyword matching on cleaned text and stores a `decisions` row per listing. New: `config/settings.yaml` + `config.py`, `pipeline.py`, `main.py`, `navigation/factory.py`, `matching/{factory,run}.py`. Live run: 4 new stored, 13 known, 17 scored, 2 matches. Matching raw text would have flagged 16 of 17 (SAP appears in CanadaBuys boilerplate), so cleaning is essential.
 - Keyword-in-boilerplate warnings are logged each run (CanadaBuys: the 'register in SAP Ariba' help sentence, found in 16 of 17 postings, is the one stripped line with a keyword). Known weak spot: one match ("SAP Business Network event") is the SAP platform named in tender instructions, not an SAP project. Keywords alone cannot tell the difference; this is the kind of case Jev should separate in demo 2.
-- **Next step:** merge `feat/pipeline-matching`, then `feat/email-report` (vision stream on hold by the developer's choice).
+- `feat/email-report` built (not yet merged): each run writes a nicely formatted report as .html (cards, keyword chips, highlighted snippets, readable on a phone) and .txt. Matches are ranked by number of different keywords, then total mentions, then newest. Failed sites show in a red box at the top; the report is produced even with zero matches. Verified on run 6 with screenshots.
+- Report rough edges to fix later: snippets can start or end mid-word, and titles keep the site's suffix ("- Tender Notice | CanadaBuys").
+- **Next step:** merge `feat/email-report`, then sending once recipients are known (vision stream on hold).
 
 ## How we work
 
@@ -69,7 +71,8 @@ These links are private claude.ai pages that coding agents cannot open. Everythi
 - [x] Database schema (listings, decisions, runs)
 - [x] Keyword matcher (whole-word, case-insensitive, phrases, matched-keyword snippets)
 - [x] Pipeline wiring: one run stores postings and keyword decisions (`python -m sonar.main`)
-- [ ] Email report template and sending
+- [x] Report files: `report/{build,render}.py` + `templates/report.{html,txt}`; written to `data/reports/report-run-<id>.html/.txt` after every run (`python -m sonar.main`, or `scripts/make_report.py RUN_ID` for a past run)
+- [ ] Sending the report (email via SMTP or Microsoft Graph, and/or a Teams message); waiting on recipients and IT answers (see Open questions)
 
 ### Demo 2: Jev matching
 - [ ] Jev matcher behind the matcher interface
@@ -131,6 +134,7 @@ These links are private claude.ai pages that coding agents cannot open. Everythi
 | 2026-10-09 | Matching runs AFTER all of a site's new postings are stored, on every listing that has no decision from the current matcher (not only this run's). So boilerplate is measured on the freshest data, a first run works, a crash between storing and matching is finished by the next run, and a new matcher scores old listings. Runs end `ok`, `partial` (some sites failed) or `failed`, with failed sites listed in `runs.notes` for the report. Matchers and navigators are chosen by `config/settings.yaml` through two factories (`matching/factory.py`, `navigation/factory.py`) |
 | 2026-10-09 | Guarding against lost keywords: stripping needs 15+ stored postings per site (was 5), so a small or lopsided sample cannot hide real content; early on we accept extra matches over lost ones. Every run also logs a WARNING for each stripped boilerplate line that contains a client keyword (keyword, how many postings, the line) so a human can confirm it really is boilerplate. Not done: letting the report show these warnings, and a way to exclude a line from stripping; add both if a real keyword is ever hidden |
 | 2026-10-09 | Priority: vision stream on hold; email report next |
+| 2026-10-09 | Report: built from the database by plain code (no agent), rendered with Jinja2 to a self-contained HTML file and a plain-text file, one pair per run. Ranking: more different keywords, then more total mentions, then newest. Each match shows its first two snippets. Posting text is untrusted: HTML is escaped, only http(s) links are emitted, highlighting works on escaped text. Delivery is separate from the report so email and Teams can be added without touching it |
 
 ## Notes for agents on this machine (Windows)
 
@@ -152,7 +156,7 @@ These links are private claude.ai pages that coding agents cannot open. Everythi
 - [ ] CanadaBuys returns 403 to headless Chromium (headed works). Daily runs are meant to be headless on the VM: try Chromium's new headless mode / a normal user agent, or run headed under a virtual display
 - [ ] Azure VM confirmed?
 - [ ] Approved LLM provider for production (Anthropic API, Microsoft Foundry, other)?
-- [ ] Email: Microsoft Graph or SMTP? Recipients and frequency?
+- [ ] Sending: company addresses are `@xyzitgroup.com`. SMTP or Microsoft Graph depends on the company's Microsoft 365 setup (SMTP sign-in is often disabled by IT); to confirm. Recipients (a person, or an agent/bot in Microsoft Teams) and frequency: developer will say later; Teams delivery would be a separate channel
 - [ ] Vision stream text extraction: code (recommended) or screenshots?
 - [ ] Threshold trade-off: favor recall over precision?
 - [ ] Final name

@@ -5,9 +5,11 @@
 #   keywords_file: client keyword list used by the keywords matcher
 #   headless:      false shows the browser window. CanadaBuys returns 403 to headless Chromium.
 #   cdp_port:      remote-debugging port of the dedicated browser
+#   report_dir:    where each run's report files (.html and .txt) are written
 navigator: dom
 matcher: keywords
 database_url: "sqlite:///data/sonar.db"
 keywords_file: config/keywords.yaml
 headless: false
 cdp_port: 9333
+report_dir: data/reports

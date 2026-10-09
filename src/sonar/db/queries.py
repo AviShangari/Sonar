@@ -1,0 +1,58 @@
+"""Small, single-purpose database functions."""
+
+from sqlalchemy import select
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session
+
+from sonar.db.tables import DecisionRow, ListingRow, RunRow, utcnow
+from sonar.models import Decision, Listing
+
+
+def start_run(engine: Engine) -> int:
+    with Session(engine) as session:
+        run = RunRow()
+        session.add(run)
+        session.commit()
+        return run.id
+
+
+def finish_run(engine: Engine, run_id: int, status: str, notes: str | None = None) -> None:
+    with Session(engine) as session:
+        run = session.get(RunRow, run_id)
+        run.status, run.notes, run.finished_at = status, notes, utcnow()
+        session.commit()
+
+
+def listing_exists(engine: Engine, site: str, job_id: str) -> bool:
+    """Dedup check: call this before extracting, matching or summarizing."""
+    with Session(engine) as session:
+        query = select(ListingRow.id).where(ListingRow.site == site, ListingRow.job_id == job_id)
+        return session.scalar(query) is not None
+
+
+def add_listing(engine: Engine, listing: Listing, run_id: int) -> int:
+    """Store a new listing and return its id. Raises IntegrityError on a duplicate."""
+    with Session(engine) as session:
+        row = ListingRow(**listing.model_dump(), run_id=run_id)
+        session.add(row)
+        session.commit()
+        return row.id
+
+
+def add_decision(engine: Engine, decision: Decision) -> int:
+    with Session(engine) as session:
+        row = DecisionRow(**decision.model_dump())
+        session.add(row)
+        session.commit()
+        return row.id
+
+
+def matched_listings(engine: Engine, run_id: int) -> list[tuple[ListingRow, DecisionRow]]:
+    """Listings matched in a run: the input for the email report."""
+    with Session(engine, expire_on_commit=False) as session:
+        query = (
+            select(ListingRow, DecisionRow)
+            .join(DecisionRow, DecisionRow.listing_id == ListingRow.id)
+            .where(DecisionRow.run_id == run_id, DecisionRow.matched.is_(True))
+        )
+        return [(listing, decision) for listing, decision in session.execute(query)]

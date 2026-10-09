@@ -10,6 +10,7 @@ These links are private claude.ai pages that coding agents cannot open. Everythi
 - Repo created, `uv init` done, dependencies installed, Chromium installed, context files committed.
 - SDK verified on subscription login; isolation settings proven by `scripts/check_sdk.py` (merged to `main`, PR #1).
 - Keyword matcher and fixtures done on branch `feat/test-listings` (PR pending).
+- Browser Use CLI spike done on branch `spike/browser-use-cli` (PR pending); design documented in `AGENTS.md`.
 - **Next step:** Demo 1, database schema (listings, decisions, runs).
 
 ## How we work
@@ -98,6 +99,7 @@ These links are private claude.ai pages that coding agents cannot open. Everythi
 | 2026-10-09 | Subscription login for development; API key before deployment |
 | 2026-10-09 | No hand-copied listings: synthetic fixtures test matcher rules; the real labeled set comes from the navigator's stored listings |
 | 2026-10-09 | Keyword rules: phrase words may be separated by any whitespace; overlapping keywords (Microsoft / Microsoft Dynamics) are both reported; "Robotic Process Automation (RPA)" split into two keywords |
+| 2026-10-09 | DOM stream uses the Browser Use CLI (pinned 0.13.11, separate `uv tool`) attached to a Playwright-launched dedicated browser over CDP; agent's only tool is a validated `browser(code)`, no Bash. The CLI runs arbitrary Python as the user, so the code filter is best effort; browser-level guards (non-GET block, URL allowlist) and OS isolation are the firm limits. Telemetry/update checks off; login done by our code. Proven by `spike/browser-use-cli` |
 | 2026-10-09 | Runtime agents: `setting_sources=[]`, `strict-mcp-config` + `ENABLE_CLAUDEAI_MCP_SERVERS=false` (claude.ai connectors like Gmail otherwise attach), cwd in a temp dir. Built-in skills/plugins still appear; they ship with the CLI |
 
 ## Branching

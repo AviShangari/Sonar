@@ -83,6 +83,7 @@ Create folders and files as the build reaches them. Do not scaffold empty placeh
 - Each `browser(code)` call is a separate process: variables do not persist between calls. Say so in the agent's system prompt.
 - The agent collects job IDs and links from list pages without opening postings.
 - Normalize URLs (strip query strings and fragments, resolve relative links) before keying.
+- Collection is newest first and stops in code, not in the prompt: at the first list row dated before the cutoff (newest stored `fields.listed_date`, else `first_run_days` back), capped by `max_list_pages`. The agent reads rows and clicks "load more" one step at a time when code asks.
 - Workers open new links in the logged-in session, max 2 to 3 concurrent per site.
 
 ## Keyword matching rules

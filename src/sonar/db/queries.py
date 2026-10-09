@@ -1,6 +1,8 @@
 """Small, single-purpose database functions."""
 
-from sqlalchemy import select
+from datetime import date
+
+from sqlalchemy import func, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
@@ -28,6 +30,15 @@ def listing_exists(engine: Engine, site: str, job_id: str) -> bool:
     with Session(engine) as session:
         query = select(ListingRow.id).where(ListingRow.site == site, ListingRow.job_id == job_id)
         return session.scalar(query) is not None
+
+
+def newest_listed_date(engine: Engine, site: str) -> date | None:
+    """Newest result-list date among a site's stored listings (the stop point for collection)."""
+    with Session(engine) as session:
+        value = session.scalar(
+            select(func.max(ListingRow.fields["listed_date"].as_string())).where(ListingRow.site == site)
+        )
+    return date.fromisoformat(value) if value else None
 
 
 def add_listing(engine: Engine, listing: Listing, run_id: int) -> int:

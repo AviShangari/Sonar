@@ -5,9 +5,11 @@
 #   allowed_hosts:  the browser may only navigate to these hosts (guard)
 #   hint:           optional plain-English tip for the agent
 #   requires_login: login is done by our code, never the agent
+#   max_list_pages: safety cap on "load more" steps per run (default 10)
+#   first_run_days: with an empty database, how many days back to collect (default 3)
 sites:
   - name: canadabuys
-    start_url: "https://canadabuys.canada.ca/en/tender-opportunities?status%5B0%5D=87&current_tab=t&record_per_page=50"
+    start_url: "https://canadabuys.canada.ca/en/tender-opportunities?status%5B0%5D=87&current_tab=t&record_per_page=50&order=pub_ifnot_amended&sort=desc"
     allowed_hosts: ["canadabuys.canada.ca"]
     hint: "Search results of open tender opportunities; each result links to its own tender notice page."
     requires_login: false

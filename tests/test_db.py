@@ -1,3 +1,5 @@
+from datetime import date
+
 import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -58,3 +60,16 @@ def test_finish_run_records_status(engine) -> None:
     with Session(engine) as session:
         run = session.get(RunRow, run_id)
         assert run.status == "ok" and run.finished_at is not None
+
+
+def test_newest_listed_date_is_the_latest_date_for_that_site(engine) -> None:
+    run_id = queries.start_run(engine)
+    assert queries.newest_listed_date(engine, "siteA") is None
+    for job_id, listed in [("J1", "2026-10-07"), ("J2", "2026-10-09"), ("J3", None)]:
+        listing = make_listing(job_id)
+        listing.fields = {"listed_date": listed}
+        queries.add_listing(engine, listing, run_id)
+    other = make_listing("J9", site="siteB")
+    other.fields = {"listed_date": "2026-12-31"}
+    queries.add_listing(engine, other, run_id)
+    assert queries.newest_listed_date(engine, "siteA") == date(2026, 10, 9)

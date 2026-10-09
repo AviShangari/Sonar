@@ -12,7 +12,7 @@ import os
 import sys
 from datetime import date, timedelta
 
-from sonar.db.queries import add_listing, finish_run, listing_exists, newest_listed_date, start_run
+from sonar.db.queries import add_listing, fail_stale_runs, finish_run, listing_exists, newest_listed_date, start_run
 from sonar.db.tables import make_engine
 from sonar.extraction.posting import extract_listing
 from sonar.navigation.dom import DomNavigator, agent_collector
@@ -29,6 +29,8 @@ async def main(name: str | None, limit: int, days: int | None) -> None:
     sites = {s.name: s for s in load_sites()}
     site = sites[name] if name else next(iter(sites.values()))
     engine = make_engine()
+    if closed := fail_stale_runs(engine):
+        print(f"marked {closed} interrupted earlier run(s) as failed")
     run_id = start_run(engine)
     blocked: list[str] = []
     stored = 0
@@ -54,8 +56,8 @@ async def main(name: str | None, limit: int, days: int | None) -> None:
             print(f"done: {stored} stored, {navigator.skipped_seen} already in the database")
             print("blocked by guard:", blocked)
         finish_run(engine, run_id, "ok")
-    except Exception as exc:
-        finish_run(engine, run_id, "failed", str(exc))
+    except BaseException as exc:  # includes Ctrl+C, so a stopped run is never left as "running"
+        finish_run(engine, run_id, "failed", repr(exc))
         raise
 
 

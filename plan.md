@@ -8,7 +8,8 @@ These links are private claude.ai pages that coding agents cannot open. Everythi
 ## Current status
 
 - Repo created, `uv init` done, dependencies installed, Chromium installed, context files committed.
-- **Next step:** verify the Claude Agent SDK runs with the developer's subscription login, and that runtime agents load no filesystem settings.
+- SDK verified on subscription login; isolation settings proven by `scripts/check_sdk.py` (branch `feat/sdk-smoke-test`, not yet merged).
+- **Next step:** Demo 1, 20 to 30 hand-copied listings saved as test data.
 
 ## How we work
 
@@ -50,8 +51,8 @@ These links are private claude.ai pages that coding agents cannot open. Everythi
 
 ### Setup
 - [ ] Repo, `uv init`, dependencies, Playwright Chromium
-- [ ] Confirm the Agent SDK runs with the subscription login
-- [ ] Confirm runtime agents load no filesystem settings (`CLAUDE.md`, `~/.claude/`)
+- [x] Confirm the Agent SDK runs with the subscription login (`scripts/check_sdk.py`)
+- [x] Confirm runtime agents load no filesystem settings (`CLAUDE.md`, `~/.claude/`)
 
 ### Demo 1: keyword matching
 - [ ] 20 to 30 hand-copied listings saved as test data
@@ -94,6 +95,7 @@ These links are private claude.ai pages that coding agents cannot open. Everythi
 | 2026-10-09 | Client requirement: keyword matching demoed first, Jev second; every keyword checked |
 | 2026-10-09 | Python + Claude Agent SDK with custom Playwright tools |
 | 2026-10-09 | Subscription login for development; API key before deployment |
+| 2026-10-09 | Runtime agents: `setting_sources=[]`, `strict-mcp-config` + `ENABLE_CLAUDEAI_MCP_SERVERS=false` (claude.ai connectors like Gmail otherwise attach), cwd in a temp dir. Built-in skills/plugins still appear; they ship with the CLI |
 
 ## Branching
 

@@ -1,0 +1,18 @@
+# Client keyword list. Every keyword is checked against every listing.
+# Matching is case-insensitive and whole-word; multi-word entries match as exact phrases.
+keywords:
+  - MS Dynamics
+  - SAP
+  - ServiceNow
+  - Peoplesoft
+  - Oracle
+  - Workday
+  - Microsoft
+  - change management
+  - Business intelligence
+  - IT Professional Services
+  - Robotic Process Automation
+  - RPA
+  - Project Management
+  - Business Transformation
+  - Microsoft Dynamics

@@ -103,6 +103,7 @@ Development uses the developer's Claude subscription login. API key support (and
 
 - Read `plan.md` at the start of every session; it holds current status, build order and decisions.
 - One build step at a time. Explain choices briefly; the developer is learning agent building.
+- The developer is new to dev tooling. Use plain language, define each term once, and say what you created or changed and what already existed.
 - Create a branch per build step (`feat/...`, `fix/...`, `docs/...`) from an up-to-date `main`. Never commit directly to `main`.
 - Ask before adding dependencies or changing the architecture.
 - When a step is done: tick it off in `plan.md`, update "Current status", and add any new decision to the decision log.

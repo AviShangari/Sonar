@@ -45,6 +45,14 @@ def site_posting_texts(engine: Engine, site: str) -> list[str]:
         return list(session.scalars(select(ListingRow.posting_text).where(ListingRow.site == site)))
 
 
+def undecided_listings(engine: Engine, site: str, matcher: str) -> list[ListingRow]:
+    """A site's stored listings that this matcher has not decided yet."""
+    with Session(engine, expire_on_commit=False) as session:
+        decided = select(DecisionRow.id).where(DecisionRow.listing_id == ListingRow.id, DecisionRow.matcher == matcher)
+        query = select(ListingRow).where(ListingRow.site == site, ~decided.exists()).order_by(ListingRow.id)
+        return list(session.scalars(query))
+
+
 def listing_exists(engine: Engine, site: str, job_id: str) -> bool:
     """Dedup check: call this before extracting, matching or summarizing."""
     with Session(engine) as session:

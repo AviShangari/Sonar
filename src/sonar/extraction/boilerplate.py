@@ -5,7 +5,7 @@ any one posting. The stored `posting_text` is never changed (raw data is kept); 
 text is computed when it is read, for example just before matching.
 """
 
-MIN_POSTINGS = 5  # with fewer postings we cannot tell boilerplate from content, so strip nothing
+MIN_POSTINGS = 15  # with fewer postings we cannot tell boilerplate from content, so strip nothing
 MIN_SHARE = 0.9  # a line is boilerplate if it appears in at least this share of postings
 
 

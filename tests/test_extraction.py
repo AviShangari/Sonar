@@ -15,22 +15,22 @@ def posting(i: int) -> str:
 
 
 def test_lines_in_nearly_all_postings_are_boilerplate() -> None:
-    texts = [posting(i) for i in range(10)]
+    texts = [posting(i) for i in range(15)]
     assert find_boilerplate(texts) == {"Site banner", "Closing date", "Report a problem"}
 
 
 def test_a_line_in_too_few_postings_is_content() -> None:
-    texts = [posting(i) for i in range(10)]
-    texts[0] += "\nPartner with another business"  # only 1 of 10
+    texts = [posting(i) for i in range(15)]
+    texts[0] += "\nPartner with another business"  # only 1 of 15
     assert "Partner with another business" not in find_boilerplate(texts)
 
 
 def test_nothing_is_stripped_with_too_few_postings() -> None:
-    assert find_boilerplate([posting(i) for i in range(4)]) == set()
+    assert find_boilerplate([posting(i) for i in range(14)]) == set()
 
 
 def test_strip_keeps_the_posting_content_and_drops_blank_lines() -> None:
-    boilerplate = find_boilerplate([posting(i) for i in range(10)])
+    boilerplate = find_boilerplate([posting(i) for i in range(15)])
     assert strip_boilerplate(posting(3), boilerplate) == "Tender 3\nSAP rollout number 3"
 
 

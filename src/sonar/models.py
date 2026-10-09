@@ -57,5 +57,5 @@ class RunLog(BaseModel):
     id: int
     started_at: datetime
     finished_at: datetime | None = None
-    status: str  # "running", "ok" or "failed"
+    status: str  # "running", "ok", "partial" (some sites failed) or "failed"
     notes: str | None = None

@@ -3,6 +3,49 @@
 Full design: [Listing Matcher: Design Summary](https://claude.ai/code/artifact/44639852-e4a8-4495-867a-a9302a26f957)
 Failure handling: [Listing Matcher: Failure Modes and Handling](https://claude.ai/code/artifact/02861676-cab1-47d7-b843-46f16b5e8e4a)
 
+These links are private claude.ai pages that coding agents cannot open. Everything an agent needs is in this file and `AGENTS.md`.
+
+## Current status
+
+- Repo created, `uv init` done, dependencies installed, Chromium installed, context files committed.
+- **Next step:** verify the Claude Agent SDK runs with the developer's subscription login, and that runtime agents load no filesystem settings.
+
+## How we work
+
+- One build step at a time; the developer is learning agent building, so explain choices briefly.
+- `main` always works. Each build step is a short-lived branch merged back to `main` (see Branching below).
+- Demos are tagged on `main` (`demo-1-keywords`, `demo-2-jev`). Both versions live in one codebase, switched by `config/settings.yaml`.
+
+## Demo plan
+
+1. **Demo 1, keywords:** client-provided keyword list; every keyword is checked; the report shows which keywords matched with snippets.
+2. **Demo 2, Jev:** Jev decides fit with a probability; an LLM summarizes matches. Show keyword vs Jev precision and recall on the same labeled listings.
+3. Stakeholders want to watch human-like browsing in demos: use the vision stream, headed browser, on the developer's laptop. Daily runs use the DOM stream, headless.
+
+## Evaluation (summary)
+
+- **Collection:** coverage against a hand count on one site; duplicate clicks; misclicks; run success rate. Compare both streams on the same window.
+- **Extraction:** field accuracy on 20 to 30 listings checked against the live page.
+- **Matching:** 50 to 100 listings labeled pursue/skip by decision-makers (30 double-labeled). Measure recall, precision, calibration, review-band size. Choose the threshold from the curve, biased toward recall (to confirm).
+- **Summaries:** unsupported claims vs raw text, target zero.
+- **Operations:** cost and time per listing and per run; failure rate by type.
+- The labeled set doubles as a regression test before changing prompts, keywords, Jev questions or model versions.
+
+## Failure handling (essentials)
+
+- Every failure ends in: retry, skip and log, or stop the site and alert. Never a silently empty or wrong report.
+- State lives in the database; steps are idempotent; a crashed run resumes.
+- Session expired (redirect to login): re-login once, re-save, retry; then stop the site.
+- 2FA or CAPTCHA: stop and alert a human. Account warning or restriction: stop the site immediately.
+- A site returning zero listings is treated as a failure, not a quiet day.
+- Rate limits: back off and lower concurrency. Site down: retry 3 times, then skip and note it in the report.
+- Vision: seen ID after a click means close the tab; duplicate titles are disambiguated with a second visible detail; misclick retries once.
+- DOM: normalize URLs; no ID in URL means fall back to title + client + posted date.
+- Extraction: empty text means fall back to body text and flag the site; expand "Read more" first; store missing fields as null.
+- Jev unavailable: mark listing unscored, never a non-match. Low confidence goes to a "needs review" section.
+- Always send the email, even with zero matches, and list failed sites at the top.
+- Cost cap per run; run lock per site; screenshot on navigation failure.
+
 ## Build order
 
 ### Setup
@@ -51,6 +94,14 @@ Failure handling: [Listing Matcher: Failure Modes and Handling](https://claude.a
 | 2026-10-09 | Client requirement: keyword matching demoed first, Jev second; every keyword checked |
 | 2026-10-09 | Python + Claude Agent SDK with custom Playwright tools |
 | 2026-10-09 | Subscription login for development; API key before deployment |
+
+## Branching
+
+- `main` is always working code.
+- One branch per build step, named by type: `feat/keyword-matcher`, `feat/dom-navigator`, `fix/session-expiry`, `docs/readme`.
+- Merge to `main` through a pull request once tests pass, then delete the branch.
+- Mark demo-ready versions with tags on `main`: `demo-1-keywords`, `demo-2-jev`.
+- No long-lived branch per version: keyword vs Jev and vision vs DOM are config switches, not separate code.
 
 ## Open questions
 

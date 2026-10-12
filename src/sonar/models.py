@@ -71,6 +71,8 @@ class ReportMatch(BaseModel):
     listed_date: str | None = None  # date on the site's result list
     posted_date: str | None = None  # date in the posting itself
     summary: str | None = None  # short agent-written summary; None if it could not be written
+    how_to_apply: str | None = None  # as the posting says; None if not stated or no summary
+    closing_date: str | None = None  # what to show: "2026-12-31", "2026-12-31 (unsure, please verify)" or None
     hits: list[KeywordHit]
 
 

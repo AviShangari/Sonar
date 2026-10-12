@@ -20,6 +20,13 @@ class Settings(BaseModel):
     report_dir: str = "data/reports"
     summaries: bool = True
     summary_workers: int = 4
+    email: bool = False
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""  # blank: log in with email_from
+    email_from: str = ""
+    email_to: str = ""
+    email_snippets: bool = True
 
     @property
     def report_path(self) -> Path:

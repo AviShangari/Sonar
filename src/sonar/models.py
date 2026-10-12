@@ -70,6 +70,7 @@ class ReportMatch(BaseModel):
     job_id: str
     listed_date: str | None = None  # date on the site's result list
     posted_date: str | None = None  # date in the posting itself
+    summary: str | None = None  # short agent-written summary; None if it could not be written
     hits: list[KeywordHit]
 
 

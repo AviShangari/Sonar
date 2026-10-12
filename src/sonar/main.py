@@ -17,6 +17,7 @@ from sonar.matching.factory import build_matcher
 from sonar.pipeline import SiteOutcome, run_site
 from sonar.report.build import build_report
 from sonar.report.render import write_report
+from sonar.summarize.summaries import summarize_matches
 from sonar.sites import load_sites
 
 
@@ -47,6 +48,11 @@ async def run(site_name: str | None, days: int | None, max_new: int | None) -> i
     except BaseException as exc:  # includes Ctrl+C, so a stopped run is never left as "running"
         finish_run(engine, run_id, "failed", repr(exc))
         raise
+    if settings.summaries:
+        try:  # summaries are a bonus: a failure here must not fail the run
+            print(f"summaries written: {await summarize_matches(engine, run_id, settings.matcher, workers=settings.summary_workers)}")
+        except Exception as exc:
+            print(f"summaries failed: {exc}")
     notes = "; ".join(f"{o.site}: {o.error}" for o in outcomes if o.error) or None
     status = run_status(outcomes)
     finish_run(engine, run_id, status, notes)

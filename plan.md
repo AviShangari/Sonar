@@ -19,9 +19,11 @@ These links are private claude.ai pages that coding agents cannot open. Everythi
 - Extraction cleanup merged (PR #8): generic boilerplate stripping, `posted_date`, stale-run cleanup.
 - `feat/pipeline-matching` built (not yet merged): `python -m sonar.main` runs navigate, dedup, store, then keyword matching on cleaned text and stores a `decisions` row per listing. New: `config/settings.yaml` + `config.py`, `pipeline.py`, `main.py`, `navigation/factory.py`, `matching/{factory,run}.py`. Live run: 4 new stored, 13 known, 17 scored, 2 matches. Matching raw text would have flagged 16 of 17 (SAP appears in CanadaBuys boilerplate), so cleaning is essential.
 - Keyword-in-boilerplate warnings are logged each run (CanadaBuys: the 'register in SAP Ariba' help sentence, found in 16 of 17 postings, is the one stripped line with a keyword). Known weak spot: one match ("SAP Business Network event") is the SAP platform named in tender instructions, not an SAP project. Keywords alone cannot tell the difference; this is the kind of case Jev should separate in demo 2.
-- `feat/email-report` built (not yet merged): each run writes a nicely formatted report as .html (cards, keyword chips, highlighted snippets, readable on a phone) and .txt. Matches are ranked by number of different keywords, then total mentions, then newest. Failed sites show in a red box at the top; the report is produced even with zero matches. Verified on run 6 with screenshots.
-- Report rough edges to fix later: snippets can start or end mid-word, and titles keep the site's suffix ("- Tender Notice | CanadaBuys").
-- **Next step:** merge `feat/email-report`, then sending once recipients are known (vision stream on hold).
+- Pipeline matching (PR #9) and report files (PR #10) merged. Each run writes `data/reports/report-run-<id>.html/.txt`.
+- `feat/summaries` built (not yet merged): an agent with NO tools writes a 2 to 4 sentence summary for each match, from the cleaned stored text, saved in `listings.fields.summary`; shown in the HTML and text reports. Live: 12 summaries for run 7 in 63 s one at a time, 24 s with 4 agents at once (`summary_workers: 4`). A failed summary is skipped and never fails the run. Setting: `summaries: true`.
+- Report rough edges to fix later: snippets can start or end mid-word, titles keep the site's suffix ("- Tender Notice | CanadaBuys"); many "SAP" matches are SAP Ariba / Business Network platform mentions, not SAP projects.
+- Developer's email requirement: after the searches, send a PLAIN-TEXT body to one specific address, listing for each matched posting its name, summary, original link and number of keyword matches. SMTP assumed (developer's guess); details and recipient still to come.
+- **Next step:** merge `feat/summaries`, then `feat/email-send` (plain-text email over SMTP; tested without a real mailbox until the SMTP details arrive). Vision stream on hold.
 
 ## How we work
 
@@ -72,11 +74,11 @@ These links are private claude.ai pages that coding agents cannot open. Everythi
 - [x] Keyword matcher (whole-word, case-insensitive, phrases, matched-keyword snippets)
 - [x] Pipeline wiring: one run stores postings and keyword decisions (`python -m sonar.main`)
 - [x] Report files: `report/{build,render}.py` + `templates/report.{html,txt}`; written to `data/reports/report-run-<id>.html/.txt` after every run (`python -m sonar.main`, or `scripts/make_report.py RUN_ID` for a past run)
-- [ ] Sending the report (email via SMTP or Microsoft Graph, and/or a Teams message); waiting on recipients and IT answers (see Open questions)
+- [ ] Sending: plain-text email to one address after each run (SMTP, `feat/email-send`); Teams or Graph later if needed. Needs SMTP host, sender, recipient (see Open questions)
 
 ### Demo 2: Jev matching
 - [ ] Jev matcher behind the matcher interface
-- [ ] Summaries for matches only
+- [x] Summaries for matches only (`summarize/summaries.py`, tool-less agent via `agent_runner.run_text_agent`)
 - [ ] Labeled set (50 to 100 listings, labeled by decision-makers)
 - [ ] Compare keyword vs Jev: precision and recall
 
@@ -135,10 +137,14 @@ These links are private claude.ai pages that coding agents cannot open. Everythi
 | 2026-10-09 | Guarding against lost keywords: stripping needs 15+ stored postings per site (was 5), so a small or lopsided sample cannot hide real content; early on we accept extra matches over lost ones. Every run also logs a WARNING for each stripped boilerplate line that contains a client keyword (keyword, how many postings, the line) so a human can confirm it really is boilerplate. Not done: letting the report show these warnings, and a way to exclude a line from stripping; add both if a real keyword is ever hidden |
 | 2026-10-09 | Priority: vision stream on hold; email report next |
 | 2026-10-09 | Report: built from the database by plain code (no agent), rendered with Jinja2 to a self-contained HTML file and a plain-text file, one pair per run. Ranking: more different keywords, then more total mentions, then newest. Each match shows its first two snippets. Posting text is untrusted: HTML is escaped, only http(s) links are emitted, highlighting works on escaped text. Delivery is separate from the report so email and Teams can be added without touching it |
+| 2026-10-11 | Email requirement: plain-text body to a specific address after each run; per posting: name, summary, original link, number of keyword matches. SMTP (stdlib `smtplib`, no new dependency) with host, port, sender and recipient in `config/settings.yaml` and the password only from an environment variable via `secrets.py` |
+| 2026-10-11 | Summaries: written only for matches, from the boilerplate-stripped stored text (max 12,000 chars sent), by an agent with no tools (`setting_sources=[]`, no built-in tools, no claude.ai connectors, cwd outside the repo). Posting text is treated as data in the prompt; the answer is whitespace-collapsed and capped at 700 characters, stored in `fields.summary`, shown as plain text or escaped HTML. A failure leaves the listing without a summary and the report falls back to the keyword snippets |
+| 2026-10-11 | Summary length: as long as the posting needs (prompt says usually 3 to 8 sentences, concise), safety cap 1,800 characters. Summaries run with up to `summary_workers` (default 4) agents at once through an asyncio semaphore; each agent is its own process, so raise the number carefully (memory, subscription rate limits). Two of twelve live summaries reached the cap, so the cap may need raising |
+| 2026-10-11 | Email content per matched posting: title, summary, original link, keyword counts shown both ways (total mentions and number of different keywords, plus the keywords by name with their counts, e.g. `SAP (3), Project Management (2)`), and up to 2 keyword snippets followed by "+N more" when there are more. Setting `email_snippets: true` turns the snippets off. Falls back to the snippets alone when a posting has no summary |
 
 ## Notes for agents on this machine (Windows)
 
-- `uv` and `gh` are not on PATH. Run Python with `.\.venv\Scripts\python.exe`; for scripts set `$env:PYTHONPATH="src"` first.
+- `uv` and `gh` are not on PATH. Run Python with `.\.venv\Scripts\python.exe` (or activate `.venv`); `PYTHONPATH` is not needed because the project is installed editable in `.venv`.
 - Long bash heredocs failed to parse; create files with the Write/Edit tools.
 - The developer merges PRs on GitHub themselves. Commit and push only when asked.
 

@@ -35,6 +35,7 @@ def build_report(engine: Engine, run_id: int, matcher: str) -> Report:
             job_id=listing.job_id,
             listed_date=(listing.fields or {}).get("listed_date"),
             posted_date=(listing.fields or {}).get("posted_date"),
+            summary=(listing.fields or {}).get("summary"),
             hits=[KeywordHit(**hit) for hit in decision.details.get("hits", [])],
         )
         for listing, decision in matched_listings(engine, run_id)

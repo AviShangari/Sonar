@@ -92,17 +92,36 @@ async def run_browser_agent(
             return {"content": [{"type": "text", "text": f"REJECTED: {exc}"}], "is_error": True}
         return {"content": [{"type": "text", "text": await run_cli(port, code)}]}
 
-    options = ClaudeAgentOptions(
-        cwd=tempfile.mkdtemp(prefix="sonar-agent-"),  # outside the repo
-        setting_sources=[],  # load no CLAUDE.md, skills or settings
-        tools=[],  # no built-in tools: no Bash, no file access
+    options = isolated_options(
+        system_prompt, max_turns,
         mcp_servers={"browser": create_sdk_mcp_server("browser", tools=[browser_tool])},
         allowed_tools=["mcp__browser__browser"],
+    )
+    return await run_query(task, options, timeout_s)
+
+
+async def run_text_agent(system_prompt: str, task: str, max_turns: int = 2, timeout_s: int = 120) -> str:
+    """Run an agent with NO tools (it can only answer in text) and return its answer.
+    Raises AgentError on any failure."""
+    return await run_query(task, isolated_options(system_prompt, max_turns), timeout_s)
+
+
+def isolated_options(system_prompt: str, max_turns: int, **extra) -> ClaudeAgentOptions:
+    """Runtime agents load no CLAUDE.md, skills, settings or claude.ai connectors, run outside the
+    repo, and get no built-in tools (no Bash, no file access). Only what we pass is available."""
+    return ClaudeAgentOptions(
+        cwd=tempfile.mkdtemp(prefix="sonar-agent-"),
+        setting_sources=[],
+        tools=[],
         extra_args={"strict-mcp-config": None},
         env={"ENABLE_CLAUDEAI_MCP_SERVERS": "false"},
         system_prompt=system_prompt,
         max_turns=max_turns,
+        **extra,
     )
+
+
+async def run_query(task: str, options: ClaudeAgentOptions, timeout_s: int) -> str:
     result: ResultMessage | None = None
     try:
         async with asyncio.timeout(timeout_s):

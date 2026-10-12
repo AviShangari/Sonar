@@ -18,6 +18,8 @@ class Settings(BaseModel):
     headless: bool = False
     cdp_port: int = 9333
     report_dir: str = "data/reports"
+    summaries: bool = True
+    summary_workers: int = 4
 
     @property
     def report_path(self) -> Path:

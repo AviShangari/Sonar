@@ -53,6 +53,14 @@ def undecided_listings(engine: Engine, site: str, matcher: str) -> list[ListingR
         return list(session.scalars(query))
 
 
+def set_listing_field(engine: Engine, listing_id: int, key: str, value: str | None) -> None:
+    """Set one entry of a listing's `fields` (e.g. its summary), keeping the others."""
+    with Session(engine) as session:
+        row = session.get(ListingRow, listing_id)
+        row.fields = {**(row.fields or {}), key: value}  # a new dict, so the JSON column notices the change
+        session.commit()
+
+
 def listing_exists(engine: Engine, site: str, job_id: str) -> bool:
     """Dedup check: call this before extracting, matching or summarizing."""
     with Session(engine) as session:

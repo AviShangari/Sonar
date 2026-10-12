@@ -16,6 +16,10 @@ Run {{ report.run_id }}  |  {{ report.started_at }}  |  matcher: {{ report.match
 
    Keywords: {% for hit in m.hits %}{{ hit.keyword }}{% if hit.count > 1 %} (x{{ hit.count }}){% endif %}{{ ", " if not loop.last }}{% endfor %}
 
+{% if m.summary %}
+{{ m.summary|wrap("   ") }}
+
+{% endif %}
 {% for hit in m.hits[:2] %}
 {{ ('"' ~ hit.snippet ~ '"')|wrap("   > ") }}
 {% endfor %}

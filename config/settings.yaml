@@ -6,6 +6,8 @@
 #   headless:      false shows the browser window. CanadaBuys returns 403 to headless Chromium.
 #   cdp_port:      remote-debugging port of the dedicated browser
 #   report_dir:    where each run's report files (.html and .txt) are written
+#   summaries:     true: an agent writes a short summary for each match (needs the Claude login)
+#   summary_workers: how many summary agents run at the same time (each is a separate process)
 navigator: dom
 matcher: keywords
 database_url: "sqlite:///data/sonar.db"
@@ -13,3 +15,5 @@ keywords_file: config/keywords.yaml
 headless: false
 cdp_port: 9333
 report_dir: data/reports
+summaries: true
+summary_workers: 4

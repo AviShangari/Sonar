@@ -14,6 +14,16 @@ def _rank_key(match: ReportMatch) -> tuple[int, int]:
     return (-len(match.hits), -sum(hit.count for hit in match.hits))
 
 
+def closing_text(fields: dict) -> str | None:
+    """How the closing date is shown. None when the posting was not read yet (no summary)."""
+    if "closing_unsure" not in fields:
+        return None
+    date = fields.get("closing_date")
+    if not date:
+        return "not found, please verify"
+    return f"{date} (unsure, please verify)" if fields.get("closing_unsure") else date
+
+
 def build_report(engine: Engine, run_id: int, matcher: str) -> Report:
     """The report for a run: counts, failed sites (if any) and the matches that run found.
     Always produced, even with zero matches."""
@@ -36,6 +46,8 @@ def build_report(engine: Engine, run_id: int, matcher: str) -> Report:
             listed_date=(listing.fields or {}).get("listed_date"),
             posted_date=(listing.fields or {}).get("posted_date"),
             summary=(listing.fields or {}).get("summary"),
+            how_to_apply=(listing.fields or {}).get("how_to_apply") or None,
+            closing_date=closing_text(listing.fields or {}),
             hits=[KeywordHit(**hit) for hit in decision.details.get("hits", [])],
         )
         for listing, decision in matched_listings(engine, run_id)

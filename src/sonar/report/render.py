@@ -52,6 +52,11 @@ def render_text(report: Report) -> str:
     return _environment().get_template("report.txt").render(report=report, width=TEXT_WIDTH)
 
 
+def render_email_text(report: Report, snippets: bool = True) -> str:
+    """The plain-text email body: per match title, summary, link and keyword counts."""
+    return _environment().get_template("email.txt").render(report=report, snippets=snippets)
+
+
 def write_report(report: Report, out_dir: Path) -> list[Path]:
     """Write report-run-<id>.html and .txt into out_dir and return the paths."""
     out_dir.mkdir(parents=True, exist_ok=True)

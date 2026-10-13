@@ -12,7 +12,7 @@ import sys
 
 from sqlalchemy.engine import Engine
 
-from sonar import llm
+from sonar import budget, llm
 from sonar.config import Settings, load_settings
 from sonar.db.queries import fail_stale_runs, finish_run, start_run
 from sonar.db.tables import make_engine
@@ -65,21 +65,39 @@ async def run_locked(settings: Settings, sites: list[SiteConfig], days: int | No
         print(f"marked {closed} interrupted earlier run(s) as failed")
     matcher = build_matcher(settings)
     run_id = start_run(engine)
+    budget.configure(budget.RunBudget.from_settings(settings))  # fresh counters for this run
+    await budget.current.begin()
     outcomes: list[SiteOutcome] = []
     try:
         for site in sites:  # one after another; each site fails on its own
+            if budget.current.exhausted:  # a run-wide cost limit was hit: do not start another site
+                budget.current.note_hit(f"skipped:{site.name}", f"{site.name} was not started")
+                continue
             outcomes.append(await run_site(site, settings, engine, matcher, run_id, days, max_new))
     except BaseException as exc:  # includes Ctrl+C, so a stopped run is never left as "running"
         finish_run(engine, run_id, "failed", repr(exc))
         deliver(engine, run_id, settings)  # a crashed run must not look like a quiet day
         raise
+    # Navigation and summaries run one after the other, so the spend at this boundary splits the bill by model.
+    nav_real, nav_sdk = await budget.current.final_spent_usd(), budget.current.sdk_cost_usd
     if settings.summaries:
         try:  # summaries are a bonus: a failure here must not fail the run
             print(f"summaries written: {await summarize_matches(engine, run_id, settings.matcher, workers=settings.summary_workers)}")
         except Exception as exc:
             print(f"summaries failed: {exc}")
-    notes = "; ".join(f"{o.site}: {o.error}" for o in outcomes if o.error) or None
     status = run_status(outcomes)
+    problems = [f"{o.site}: {o.error}" for o in outcomes if o.error] + budget.current.notes()
+    if status == "ok" and budget.current.hits:
+        status = "partial"  # a cost limit cut the run short: say so, and the cut sites keep their watermark
+    notes = "; ".join(problems) or None
+    total_real = await budget.current.final_spent_usd()
+    print(budget.current.summary_line(total_real))
+    if nav_real is not None and total_real is not None:
+        print(
+            f"cost by model: navigation ({settings.navigation_model}) OpenRouter ${nav_real:.4f}, SDK ${nav_sdk:.4f}; "
+            f"summaries ({settings.summary_model}) OpenRouter ${max(0.0, total_real - nav_real):.4f}, "
+            f"SDK ${budget.current.sdk_cost_usd - nav_sdk:.4f}"
+        )
     finish_run(engine, run_id, status, notes)
     print_summary(run_id, status, outcomes)
     deliver(engine, run_id, settings)

@@ -37,7 +37,7 @@
   <p class="sub">Run {{ report.run_id }} &middot; {{ report.started_at }} &middot; matcher: {{ report.matcher }}</p>
 
 {% if report.failed_sites %}
-  <div class="alert"><b>{{ "Some sites could not be checked" if report.status == "partial" else "This run failed" }}</b>{{ report.failed_sites }}</div>
+  <div class="alert"><b>{{ "This run was incomplete" if report.status == "partial" else "This run failed" }}</b>{{ report.failed_sites }}</div>
 {% endif %}
 
   <div class="stats">

@@ -4,7 +4,7 @@
 <p style="margin:0 0 4px;font-size:16px;font-weight:bold;">SONAR: {{ report.matches|length }} {{ "match" if report.matches|length == 1 else "matches" }} (run {{ report.run_id }}, {{ report.started_at }})</p>
 <p style="margin:0 0 16px;color:#555;">{{ report.new_postings }} new postings found | {{ report.scored }} checked</p>
 {% if report.failed_sites %}
-<p style="margin:0 0 16px;padding:10px;background:#fdecea;border:1px solid #d93025;color:#8a1c14;white-space:pre-wrap;"><strong>{{ "SOME SITES COULD NOT BE CHECKED" if report.status == "partial" else "THIS RUN FAILED" }}</strong>
+<p style="margin:0 0 16px;padding:10px;background:#fdecea;border:1px solid #d93025;color:#8a1c14;white-space:pre-wrap;"><strong>{{ "THIS RUN WAS INCOMPLETE" if report.status == "partial" else "THIS RUN FAILED" }}</strong>
 {{ report.failed_sites }}</p>
 {% endif %}
 {% if report.matches %}

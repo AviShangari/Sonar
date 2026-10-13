@@ -16,7 +16,7 @@ def build_message(report: Report, settings: Settings) -> EmailMessage:
     count = len(report.matches)
     subject = f"Sonar: {count} {'match' if count == 1 else 'matches'} (run {report.run_id})"
     if report.status == "partial":
-        subject = "[SOME SITES FAILED] " + subject
+        subject = "[PARTIAL RUN] " + subject
     elif report.status != "ok":
         subject = "[RUN FAILED] " + subject
     message = EmailMessage()

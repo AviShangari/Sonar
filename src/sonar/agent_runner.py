@@ -22,6 +22,8 @@ from claude_agent_sdk import (
     tool,
 )
 
+from sonar import budget
+from sonar.budget import BudgetExceeded
 from sonar.llm import Role, agent_llm_options
 from sonar.navigation.code_check import CodeRejected, check_code
 from sonar.navigation.session import DATA_DIR
@@ -119,12 +121,14 @@ def isolated_options(system_prompt: str, max_turns: int, role: Role, **extra) ->
         extra_args={"strict-mcp-config": None},
         system_prompt=system_prompt,
         max_turns=max_turns,
+        max_budget_usd=budget.current.max_call_usd,
         **{**llm, "env": {"ENABLE_CLAUDEAI_MCP_SERVERS": "false", **llm.get("env", {})}},
         **extra,
     )
 
 
 async def run_query(task: str, options: ClaudeAgentOptions, timeout_s: int) -> str:
+    await budget.current.charge_agent_call()  # raises BudgetExceeded once a run-wide limit is hit
     result: ResultMessage | None = None
     try:
         async with asyncio.timeout(timeout_s):
@@ -137,6 +141,12 @@ async def run_query(task: str, options: ClaudeAgentOptions, timeout_s: int) -> s
                     result = message
     except TimeoutError as exc:
         raise AgentError(f"agent run exceeded {timeout_s}s") from exc
+    if result is not None:
+        budget.current.sdk_cost_usd += result.total_cost_usd or 0.0
+        if result.subtype == "error_max_budget_usd":  # one call spent more than max_call_usd
+            msg = f"one agent call passed the ${budget.current.max_call_usd} per-call limit"
+            budget.current.note_hit("call_usd", msg)
+            raise BudgetExceeded(msg)
     if result is None or result.is_error or not result.result:
         raise AgentError(f"agent run failed: {getattr(result, 'subtype', 'no result')}")
     return result.result

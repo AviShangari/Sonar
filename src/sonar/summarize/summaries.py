@@ -22,6 +22,7 @@ from pydantic import BaseModel
 
 from sqlalchemy.engine import Engine
 
+from sonar import budget
 from sonar.agent_runner import run_text_agent
 from sonar.db.queries import matched_listings, set_listing_field, site_posting_texts
 from sonar.extraction.boilerplate import find_boilerplate, strip_boilerplate
@@ -142,6 +143,9 @@ async def summarize_matches(
         if listing.site not in boilerplate:
             boilerplate[listing.site] = find_boilerplate(site_posting_texts(engine, listing.site))
         jobs.append((listing, strip_boilerplate(listing.posting_text, boilerplate[listing.site])))
+    if (cap := budget.current.max_summaries) is not None and len(jobs) > cap:
+        budget.current.note_hit("summaries", f"limit of {cap} summaries reached; {len(jobs) - cap} matches have no summary")
+        jobs = jobs[:cap]
 
     slots = asyncio.Semaphore(max(1, workers))  # at most `workers` agents at once
 

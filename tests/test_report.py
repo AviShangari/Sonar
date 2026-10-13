@@ -50,9 +50,9 @@ def test_failed_sites_are_shown_at_the_top() -> None:
     queries.finish_run(engine, run_id, "partial", "siteB: TimeoutError: boom")
     report = build_report(engine, run_id, "keywords")
     html, text = render_html(report), render_text(report)
-    assert "Some sites could not be checked" in html and "siteB: TimeoutError: boom" in html
+    assert "This run was incomplete" in html and "siteB: TimeoutError: boom" in html
     assert html.index("siteB") < html.index("Matches")
-    assert "SOME SITES COULD NOT BE CHECKED" in text and text.index("siteB") < text.index("0 matches")
+    assert "THIS RUN WAS INCOMPLETE" in text and text.index("siteB") < text.index("0 matches")
 
 
 def test_untrusted_text_is_escaped_and_bad_links_are_neutralized() -> None:

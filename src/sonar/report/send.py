@@ -31,7 +31,20 @@ def send_report(report: Report, settings: Settings) -> None:
     """Send the report. Raises on any failure; the caller decides that a failed email must not fail the run."""
     if not (settings.smtp_host and settings.email_from and settings.email_to):
         raise RuntimeError("email is on but smtp_host, email_from or email_to is missing in config/settings.yaml")
-    message = build_message(report, settings)
+    _send(build_message(report, settings), settings)
+
+
+def send_alert(settings: Settings, subject: str, body: str) -> None:
+    """Send a short plain-text notice that is not a run report (for example, a run was skipped)."""
+    if not (settings.smtp_host and settings.email_from and settings.email_to):
+        raise RuntimeError("email is on but smtp_host, email_from or email_to is missing in config/settings.yaml")
+    message = EmailMessage()
+    message["Subject"], message["From"], message["To"] = subject, settings.email_from, settings.email_to
+    message.set_content(body)
+    _send(message, settings)
+
+
+def _send(message: EmailMessage, settings: Settings) -> None:
     password = smtp_password()
     login = settings.smtp_username or settings.email_from
     context = ssl.create_default_context()

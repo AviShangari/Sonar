@@ -18,6 +18,7 @@ class Settings(BaseModel):
     headless: bool = False
     cdp_port: int = 9333
     report_dir: str = "data/reports"
+    lock_dir: str = "data"  # holds the run lock file
     summaries: bool = True
     summary_workers: int = 4
     email: bool = False
@@ -31,6 +32,10 @@ class Settings(BaseModel):
     @property
     def report_path(self) -> Path:
         return ROOT / self.report_dir
+
+    @property
+    def lock_path(self) -> Path:
+        return ROOT / self.lock_dir
 
     @property
     def keywords_path(self) -> Path:

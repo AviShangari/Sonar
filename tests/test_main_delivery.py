@@ -22,7 +22,7 @@ def wired(monkeypatch, tmp_path):
     engine = make_engine("sqlite://")
     settings = Settings(
         database_url="sqlite://", email=True, smtp_host="smtp.example", email_from="a@example.com",
-        email_to="b@example.com", report_dir=str(tmp_path), summaries=False,
+        email_to="b@example.com", report_dir=str(tmp_path), summaries=False, lock_dir=str(tmp_path),
     )
     sent: list = []
     monkeypatch.setattr(main, "load_settings", lambda: settings)
@@ -73,3 +73,23 @@ def test_a_normal_run_with_no_matches_still_sends_one_email(wired, monkeypatch) 
     monkeypatch.setattr(main, "run_site", quiet)
     assert asyncio.run(main.run(None, None, None)) == 0
     assert len(sent) == 1 and sent[0].status == "ok" and sent[0].matches == []
+
+
+def test_a_run_is_skipped_with_an_alert_while_another_run_holds_the_lock(wired, monkeypatch) -> None:
+    engine, sent, tmp_path = wired
+    alerts: list = []
+    started: list = []
+
+    async def should_not_run(*args, **kwargs):
+        started.append(True)
+
+    monkeypatch.setattr(main, "send_alert", lambda settings, subject, body: alerts.append(subject))
+    monkeypatch.setattr(main, "run_site", should_not_run)
+    with main.run_lock("run", tmp_path):  # another run is in progress
+        assert asyncio.run(main.run(None, None, None)) == 2
+    assert started == [] and sent == []  # no site was touched and no report was made
+    assert alerts and alerts[0].startswith("[RUN SKIPPED]")
+    from sqlalchemy.orm import Session
+
+    with Session(engine) as session:
+        assert session.query(RunRow).count() == 0  # a skipped run does not even create a run record

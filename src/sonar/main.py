@@ -19,9 +19,10 @@ from sonar.matching.factory import build_matcher
 from sonar.pipeline import SiteOutcome, run_site
 from sonar.report.build import build_report
 from sonar.report.render import write_report
-from sonar.report.send import send_report
+from sonar.report.send import send_alert, send_report
+from sonar.runlock import RunLocked, run_lock
 from sonar.summarize.summaries import summarize_matches
-from sonar.sites import load_sites
+from sonar.sites import SiteConfig, load_sites
 
 
 def run_status(outcomes: list[SiteOutcome]) -> str:
@@ -39,6 +40,20 @@ async def run(site_name: str | None, days: int | None, max_new: int | None) -> i
     sites = [s for s in load_sites() if site_name in (None, s.name)]
     if not sites:
         sys.exit(f"no site named '{site_name}' in config/sites.yaml")
+    try:
+        with run_lock("run", settings.lock_path):  # one run at a time
+            return await run_locked(settings, sites, days, max_new)
+    except RunLocked as exc:
+        print(f"run skipped: {exc}")
+        if settings.email:
+            try:  # nobody is watching a scheduled run, so say so by email
+                send_alert(settings, "[RUN SKIPPED] Sonar: another run was still in progress", f"{exc}\n\nThis run did nothing.")
+            except Exception as mail_exc:
+                print(f"alert email failed: {mail_exc}")
+        return 2
+
+
+async def run_locked(settings: Settings, sites: list[SiteConfig], days: int | None, max_new: int | None) -> int:
     engine = make_engine(settings.database_url)
     if closed := fail_stale_runs(engine):
         print(f"marked {closed} interrupted earlier run(s) as failed")

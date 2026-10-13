@@ -1,6 +1,7 @@
 """The ONLY place secrets are read. They come from environment variables or the gitignored .env file at the repo root."""
 
 import os
+import re
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -27,3 +28,10 @@ def smtp_password() -> str:
 def openrouter_api_key() -> str:
     """The OpenRouter API key used when `auth: openrouter`."""
     return _secret(OPENROUTER_KEY_VAR, "running with auth: openrouter")
+
+
+def site_credentials(site_name: str) -> tuple[str, str]:
+    """(username, password) for a site that needs a login, from SONAR_<SITE>_USERNAME and
+    SONAR_<SITE>_PASSWORD (site name in capitals, for example SONAR_ONTARIOTENDERS_USERNAME)."""
+    prefix = f"SONAR_{re.sub(r'[^A-Za-z0-9]', '', site_name).upper()}"
+    return _secret(f"{prefix}_USERNAME", f"logging in to {site_name}"), _secret(f"{prefix}_PASSWORD", f"logging in to {site_name}")

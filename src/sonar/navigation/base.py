@@ -15,6 +15,7 @@ class OpenedListing:
     url: str  # normalized (no query string or fragment)
     page: Page
     listed_date: date | None = None  # date shown in the site's result list, if any
+    in_list_tab: bool = False  # opened by clicking in the list tab (page IS the list tab): closing goes back instead
 
 
 class Navigator(Protocol):

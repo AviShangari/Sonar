@@ -23,13 +23,15 @@ import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import date
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 from playwright.async_api import BrowserContext
 from pydantic import BaseModel, ValidationError
 
 from sonar.agent_runner import run_browser_agent
 from sonar.navigation.base import OpenedListing
+from sonar.navigation.guards import GuardState
+from sonar.navigation.login import log_in
 from sonar.navigation.screenshots import FailureShots
 from sonar.navigation.urls import job_id_from_url, normalize_url
 from sonar.sites import SiteConfig
@@ -39,6 +41,7 @@ log = logging.getLogger("sonar.dom")
 MAX_LINKS_PER_STEP = 200  # sanity cap on what one agent step may return
 DATE_RE = re.compile(r"(\d{4})[/-](\d{2})[/-](\d{2})")
 
+MAX_CLICK_FAILURES = 5  # postings that stay unreadable (HTTP 4xx) even after clicking their title: then stop and report
 TITLE_CHECK_CHARS = 40  # how much of a row's title must appear on the opened posting
 
 # A worked example for table-style lists, kept as real code so a test can check that the code
@@ -74,6 +77,8 @@ URLs given to new_tab/goto_url must be literal strings. Plain loops, list compre
 Every browser(code) call is a SEPARATE process: variables do not persist between calls. Do as much as you can inside one call.
 
 Getting to the list: the start address may be the list itself, or a home or login page. If it is not the list, click through to the list of current (open) opportunities the way a visitor would. Never log in, register, apply, download, or submit anything.
+
+Typed addresses versus clicking: some sites refuse any address that was not reached by clicking (the page answers 403, "Error!" or "session invalid"), even the list's own address. If typing an address fails once, that site works only by clicking: from then on never type an address again. Reach every page by clicking links and menu entries, and to return to the list click its menu link again. Whatever else you do, finish with the list open and showing its rows in one tab: our code opens each posting afterwards by clicking its title in that tab.
 
 Sort order: the list must be NEWEST FIRST by publication (posted) date. If it is sorted another way and the page has a sort control (for example a "Publication Date" column header; some need a second click for newest first), use it, then check the order.
 
@@ -117,6 +122,11 @@ class Candidate:
     job_id: str | None
     title: str
     listed_date: date | None
+    nth: int = 0  # among rows with this exact title, which one this is (0 = first), for clicking the right one
+
+
+class OpenFailures(RuntimeError):
+    """Too many postings stayed unreadable (HTTP 4xx) after the click fallback; the site is stopped."""
 
 
 class CollectionError(RuntimeError):
@@ -153,19 +163,22 @@ def parse_date(text: str | None) -> date | None:
         return None
 
 
-def to_candidates(found: FoundPage, site: SiteConfig) -> list[Candidate]:
+def to_candidates(found: FoundPage, site: SiteConfig, title_counts: dict[str, int] | None = None) -> list[Candidate]:
     """Untrusted links in, candidates out: right host only, normalized, dates parsed. Order kept.
     Rows that are not results at all (wrong host, not http) are dropped."""
     out: list[Candidate] = []
+    counts = title_counts if title_counts is not None else {}
     for link in found.links:
+        nth = counts.get(link.title, 0)  # counted over every row in list order, before any filtering
+        counts[link.title] = nth + 1
         absolute = urljoin(site.start_url, link.url)  # resolves relative links
         if not absolute.startswith(("http://", "https://")):
             continue
         url = normalize_url(absolute)
-        if url.split("/")[2] not in site.allowed_hosts:
+        if (urlparse(url).hostname or "") not in site.allowed_hosts:
             continue
         # The ID is read before the query string is stripped.
-        out.append(Candidate(url, job_id_from_url(absolute), link.title, parse_date(link.date)))
+        out.append(Candidate(url, job_id_from_url(absolute), link.title, parse_date(link.date), nth))
     return out
 
 
@@ -192,7 +205,14 @@ def agent_collector(port: int) -> Collector:
     """The real collector: one agent run per step."""
 
     async def collect(site: SiteConfig, offset: int) -> str:
-        if offset == 0:
+        if offset == 0 and site.requires_login:
+            task = (
+                f"Step: you are already logged in (our code did that; never log in or out). A tab shows the page "
+                f"right after login: find it with list_tabs() and switch_tab, and start there. If you cannot find "
+                f"the list from it, open {site.start_url}. Get to the list of current opportunities sorted newest "
+                f"first, and return ALL the result rows on the page."
+            )
+        elif offset == 0:
             task = (
                 f"Step: open {site.start_url}, get to the list of current opportunities sorted newest first, "
                 f"and return ALL the result rows on the page."
@@ -222,8 +242,10 @@ class DomNavigator:
         is_seen: Callable[[str], bool],
         cutoff: date,
         shots: FailureShots | None = None,
+        guard: GuardState | None = None,
     ) -> None:
         self.site = site
+        self.guard = guard or GuardState()
         self.context = context
         self.collect = collect
         self.is_seen = is_seen
@@ -233,23 +255,28 @@ class DomNavigator:
         self.skipped_seen = 0
         self.failed_opens = 0  # postings that would not open; the run is then not "clean"
         self.reached_cutoff = False  # False if collection ended at the page cap instead
+        self.prefer_click = False  # set once a click rescued a refused address: later postings are clicked first
+        self.click_succeeded = False  # a click ever opened a posting
+        self.list_tab_missing = False  # a click was needed but no tab had the link to click
+        self.click_failures = 0  # HTTP 4xx postings the click fallback could not read either
         self.unsorted = False  # True once the list turned out not to be newest first
 
     async def login(self) -> None:
-        if self.site.requires_login:
-            raise NotImplementedError("login is not built yet")
+        """Our code logs in (navigation/login.py); the agent never does. A no-op for sites without a login."""
+        await log_in(self.context, self.site, self.guard, self.shots)
 
     async def _collect(self) -> None:
         queue: list[Candidate] = []
         keys: set[str] = set()
         raw_rows = 0  # rows the agent has returned so far; the offset for the next step
         usable_rows = 0  # result rows on allowed hosts, whatever their date
+        title_counts: dict[str, int] = {}
         last_date: date | None = None
         stopped = False
         for step in range(self.site.max_list_pages):
             found = parse_agent_page(await self.collect(self.site, raw_rows))
             raw_rows += len(found.links)
-            candidates = to_candidates(found, self.site)
+            candidates = to_candidates(found, self.site, title_counts)
             usable_rows += len(candidates)
             # Decide on the whole step before stopping on any row: a list sorted another way (for
             # example by closing date) can show an old row first and hide new ones behind it.
@@ -298,6 +325,12 @@ class DomNavigator:
                 self.skipped_seen += 1
                 log.info("site=%s job_id=%s step=dedup outcome=skipped", self.site.name, cand.job_id)
                 continue
+            if self.prefer_click:
+                # An earlier posting showed that this site refuses typed addresses: click first, so we do not
+                # open a new tab and take a 403 for every posting. If the click fails, the address is still tried.
+                clicked = await self._open_by_click(cand, RuntimeError("HTTP 4xx (learned earlier in this run)"))
+                if clicked is not None:
+                    return clicked
             page = await self.context.new_page()
             try:
                 response = await page.goto(cand.url, wait_until="domcontentloaded")
@@ -307,14 +340,78 @@ class DomNavigator:
                     # The agent may have built this address; a page without the row's title is the wrong page.
                     raise RuntimeError(f"posting does not show its list title {cand.title[:60]!r}")
             except Exception as exc:  # one bad posting must not stop the site
+                # Some sites refuse a posting's address typed into a new tab (403) but open it when its
+                # title is clicked in the list, as a visitor does. Try that before giving up.
+                log.info("site=%s job_id=%s step=open via=address outcome=refused error=%s", self.site.name, cand.job_id, exc)
+                clicked = await self._open_by_click(cand, exc)
+                if clicked is not None:
+                    await page.close()
+                    if str(exc).startswith("HTTP 4") and not self.prefer_click:
+                        self.prefer_click = True  # learned: from now on click first on this site
+                        log.info("site=%s step=open outcome=learned_click_first reason=%s", self.site.name, exc)
+                    return clicked
                 log.warning("site=%s job_id=%s step=open outcome=failed error=%s", self.site.name, cand.job_id, exc)
                 self.failed_opens += 1
                 if self.shots:
                     await self.shots.take(page, "open", cand.job_id)
                 await page.close()
+                if self.list_tab_missing and not self.click_succeeded:
+                    # The very first click found no list to click in: waiting for four more failures would
+                    # only repeat it. The agent left the browser somewhere other than the list.
+                    raise OpenFailures(
+                        f"{self.site.name}: the postings cannot be opened by address and no open tab shows the list "
+                        f"to click in (first failure: job {cand.job_id}, {exc}); stopping the site"
+                    )
+                if str(exc).startswith("HTTP 4"):
+                    self.click_failures += 1
+                    if self.click_failures >= MAX_CLICK_FAILURES:
+                        raise OpenFailures(
+                            f"{self.site.name}: {self.click_failures} postings could not be read even after clicking "
+                            f"their titles (last: job {cand.job_id}, {exc}); stopping the site"
+                        )
                 continue
             return OpenedListing(job_id=cand.job_id, url=cand.url, page=page, listed_date=cand.listed_date)
         return None
 
+    async def _open_by_click(self, cand: Candidate, first_error: Exception) -> OpenedListing | None:
+        """Click the row's title link in the list tab. Returns the opened posting (the list tab itself,
+        now showing it), or None if the click did not lead to the posting. Read-only: it is a normal link
+        click, and the browser guards block anything that sends data."""
+        if not cand.title or not isinstance(first_error, RuntimeError) or not str(first_error).startswith("HTTP 4"):
+            return None
+        nth = cand.nth
+        pages = list(getattr(self.context, "pages", []))
+        found_any = False
+        for page in pages:
+            try:
+                links = page.get_by_role("link", name=cand.title, exact=True)
+                if await links.count() <= nth:
+                    continue
+                found_any = True
+                async with page.expect_navigation(wait_until="domcontentloaded", timeout=30_000):
+                    await links.nth(nth).click(timeout=15_000)
+                if await shows_title(page, cand.title):
+                    log.info("site=%s job_id=%s step=open outcome=ok via=click", self.site.name, cand.job_id)
+                    self.click_succeeded = True
+                    return OpenedListing(
+                        job_id=cand.job_id, url=normalize_url(page.url), page=page, listed_date=cand.listed_date, in_list_tab=True
+                    )
+                await page.go_back()  # clicked something else: restore the list and give up on this one
+            except Exception as exc:
+                log.info("site=%s job_id=%s step=open via=click outcome=no error=%s", self.site.name, cand.job_id, type(exc).__name__)
+        if not found_any and hasattr(self.context, "pages"):
+            log.warning(
+                "site=%s job_id=%s step=open via=click outcome=no_link_found tabs=%d title=%r",
+                self.site.name, cand.job_id, len(pages), cand.title[:60],
+            )
+            self.list_tab_missing = True
+        return None
+
     async def close_listing(self, listing: OpenedListing) -> None:
+        if listing.in_list_tab:  # this tab is the list: go back to it instead of closing it
+            try:
+                await listing.page.go_back(wait_until="domcontentloaded", timeout=30_000)
+            except Exception as exc:
+                log.warning("site=%s step=back outcome=failed error=%s", self.site.name, type(exc).__name__)
+            return
         await listing.page.close()

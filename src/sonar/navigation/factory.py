@@ -7,14 +7,15 @@ from playwright.async_api import BrowserContext
 
 from sonar.navigation.base import Navigator
 from sonar.navigation.dom import DomNavigator, agent_collector
+from sonar.navigation.guards import GuardState
 from sonar.navigation.screenshots import FailureShots
 from sonar.sites import SiteConfig
 
 
 def build_navigator(
     mode: str, site: SiteConfig, context: BrowserContext, port: int, is_seen: Callable[[str], bool], cutoff: date,
-    shots: FailureShots | None = None,
+    shots: FailureShots | None = None, guard: GuardState | None = None,
 ) -> Navigator:
     if mode == "dom":
-        return DomNavigator(site, context, agent_collector(port), is_seen, cutoff, shots)
+        return DomNavigator(site, context, agent_collector(port), is_seen, cutoff, shots, guard)
     raise NotImplementedError(f"navigator '{mode}' is not built yet")

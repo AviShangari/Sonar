@@ -5,7 +5,9 @@
 #   allowed_hosts:  the browser may only navigate to these hosts (guard). Each entry is a host name, or
 #                   {host: ..., hint: "..."} to give the agent a tip about that host (for example where the list is)
 #   hint:           optional plain-English tip about the whole site
-#   requires_login: login is done by our code, never the agent
+#   requires_login: login is done by our code, never the agent (then login_url is required)
+#   read_post_paths: exact URL paths where the guards let a POST through (the site loads list rows with a POST). Only after checking that it just reads
+#   login_url:      the page with the login form; credentials come from .env (SONAR_<SITE>_USERNAME / _PASSWORD)
 #   max_list_pages: safety cap on list steps ("load more" / next page) per run (default 10)
 #   first_run_days: with an empty database, how many days back to collect (default 3)
 sites:
@@ -16,7 +18,9 @@ sites:
     requires_login: false
   - name: ontariotenders
     start_url: "https://ontariotenders.app.jaggaer.com/esop/nac-host/public/web/login.html"
+    login_url: "https://ontariotenders.app.jaggaer.com/esop/nac-host/public/web/login.html"
     allowed_hosts:
       - host: ontariotenders.app.jaggaer.com
-        hint: "The start page is a login page; the job list is behind its 'Opportunities Open to All Suppliers' link."
-    requires_login: false
+        hint: "We are already logged in, on the Supplier Area dashboard. The list is the menu link 'Opportunities Open to All Suppliers' (also under Sourcing > Published Opportunities, tab Current Opportunities). Typed addresses give 403 here: reach everything by clicking, and return to the list by clicking that menu link again. Do not go back to the public login page; that leaves the logged-in area."
+    requires_login: true
+    read_post_paths: ["/esop/toolkit/opportunity/current/list-async.si"]  # the list's own sort/refresh request: a POST that only reads

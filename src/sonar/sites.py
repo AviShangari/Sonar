@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 DEFAULT_PATH = Path(__file__).resolve().parent.parent.parent / "config" / "sites.yaml"
 
@@ -18,8 +18,20 @@ class SiteConfig(BaseModel):
     host_hints: dict[str, str] = {}
     hint: str | None = None
     requires_login: bool = False
+    # Exact URL paths the browser guards let a POST through, because the site loads list rows that way (sort, page).
+    # The developer adds a path only after checking that it just reads. Never a pattern.
+    read_post_paths: list[str] = []
+    login_url: str | None = None  # the page with the login form; needed when requires_login is true
     max_list_pages: int = 10  # safety cap on list steps (load more / next page) per run
     first_run_days: int = 3  # with an empty database, collect postings from this many days back
+
+    @field_validator("read_post_paths")
+    @classmethod
+    def _exact_paths(cls, paths: list[str]) -> list[str]:
+        for path in paths:
+            if not path.startswith("/") or any(c in path for c in "*?#") or "://" in path:
+                raise ValueError(f"read_post_paths needs exact paths like /app/list.si, not {path!r}")
+        return paths
 
     @model_validator(mode="before")
     @classmethod
@@ -37,6 +49,8 @@ class SiteConfig(BaseModel):
                     hints[item["host"]] = item["hint"]
             else:
                 hosts.append(item)
+        if data.get("requires_login") and not data.get("login_url"):
+            raise ValueError(f"site '{data.get('name')}' has requires_login but no login_url")
         if unknown := set(hints) - set(hosts):
             raise ValueError(f"hints for hosts that are not allowed: {sorted(unknown)}")
         return {**data, "allowed_hosts": hosts, "host_hints": hints}

@@ -57,10 +57,10 @@ def wire(monkeypatch, engine):
     state: dict = {"navigator": FakeNavigator([]), "cutoffs": [], "fail_ids": set()}
 
     @asynccontextmanager
-    async def fake_browser(site, port, headless):
+    async def fake_browser(site, port, headless, guard=None, blocked=None):
         yield object()
 
-    def fake_build_navigator(mode, site, context, port, is_seen, cutoff, shots=None):
+    def fake_build_navigator(mode, site, context, port, is_seen, cutoff, shots=None, guard=None):
         state["cutoffs"].append(cutoff)
         return state["navigator"]
 

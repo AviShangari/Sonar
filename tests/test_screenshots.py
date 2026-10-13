@@ -131,10 +131,10 @@ def wire(monkeypatch):
     state: dict = {"navigator": OnePostingNavigator(), "extract_fails": False}
 
     @asynccontextmanager
-    async def fake_browser(site, port, headless):
+    async def fake_browser(site, port, headless, guard=None, blocked=None):
         yield FakeContext([FakePage("https://bids.example.com/list")])
 
-    def fake_build_navigator(mode, site, context, port, is_seen, cutoff, shots=None):
+    def fake_build_navigator(mode, site, context, port, is_seen, cutoff, shots=None, guard=None):
         return state["navigator"]
 
     async def fake_extract(site_name: str, opened: OpenedListing) -> Listing:

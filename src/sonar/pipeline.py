@@ -24,6 +24,7 @@ from sonar.matching.base import Matcher
 from sonar.matching.run import match_new_listings
 from sonar.models import Decision
 from sonar.navigation.factory import build_navigator
+from sonar.navigation.guards import GuardState
 from sonar.navigation.screenshots import FailureShots
 from sonar.navigation.session import open_browser
 from sonar.sites import SiteConfig
@@ -53,11 +54,13 @@ async def collect_site(
     # The stop point is the watermark, which only a clean run moves. A capped or failed run leaves it
     # where it was, so the next run re-reads down to it (known postings are skipped by dedup).
     cutoff = get_watermark(engine, site.name) or settings.today() - timedelta(days=days if days is not None else site.first_run_days)
-    async with open_browser(site, port=settings.cdp_port, headless=settings.headless) as context:
+    guard = GuardState()  # shared by the browser's guards and our login code
+    blocked: list[str] = []  # requests the guards refused (always POSTs and off-site pages)
+    async with open_browser(site, port=settings.cdp_port, headless=settings.headless, guard=guard, blocked=blocked) as context:
         shots = FailureShots(settings.screenshot_path, site.name, tz=settings.tz)
         navigator = build_navigator(
             settings.navigator, site, context, settings.cdp_port,
-            is_seen=lambda job_id: listing_exists(engine, site.name, job_id), cutoff=cutoff, shots=shots,
+            is_seen=lambda job_id: listing_exists(engine, site.name, job_id), cutoff=cutoff, shots=shots, guard=guard,
         )
         site_cap = budget.current.max_new_per_site
         cap_hit = False  # stopped by a cost limit (not by the test cap): the run is then partial
@@ -86,6 +89,11 @@ async def collect_site(
             await shots.take_current(context, "site")
             raise
         outcome.skipped_seen = getattr(navigator, "skipped_seen", 0)
+        if blocked:
+            log.info("site=%s step=guards outcome=blocked count=%d unique=%s", site.name, len(blocked), sorted(set(blocked))[:5])
+        if getattr(navigator, "failed_opens", 0) and not outcome.stored:
+            # Postings were found but not one could be opened: the site is broken for us, not quiet.
+            raise RuntimeError(f"{navigator.failed_opens} postings were found but none could be opened")
         capped = max_new is not None and outcome.stored >= max_new
         failed_opens = getattr(navigator, "failed_opens", 0)
         reached_cutoff = getattr(navigator, "reached_cutoff", True)

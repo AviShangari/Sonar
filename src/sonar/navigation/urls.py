@@ -17,16 +17,17 @@ def normalize_url(url: str, base: str | None = None) -> str:
 def job_id_from_url(url: str) -> str | None:
     """Best guess at the posting's ID from its address, or None if the URL has none.
 
-    Tries an ID-like query parameter first, then the last path segment if it contains a
-    digit (so /tender-notice/ws1234567 gives "ws1234567" but /tender-opportunities does not).
-    None means the caller falls back to title + client + posted date.
+    Tries an ID-like query parameter first, then the LAST path segment that contains a digit
+    (so /tender-notice/ws1234567 gives "ws1234567", /opportunity/current/120400/detail.si gives
+    "120400", and /tender-opportunities gives None). None means the caller falls back to title +
+    client + posted date.
     """
     parsed = urlparse(url)
     params = {key.lower(): values for key, values in parse_qs(parsed.query).items()}
     for name in ID_PARAMS:
         if params.get(name):
             return params[name][0]
-    last = parsed.path.rstrip("/").rsplit("/", 1)[-1]
-    if last and re.search(r"\d", last):
-        return last
+    for segment in reversed(parsed.path.rstrip("/").split("/")):
+        if re.search(r"\d", segment):
+            return segment
     return None

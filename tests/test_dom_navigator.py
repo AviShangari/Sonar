@@ -63,11 +63,22 @@ def test_to_candidates_filters_normalizes_and_reads_ids_and_dates() -> None:
 
 
 class FakePage:
+    """A posting page. Its text holds every title the fake agent hands out (T0, T1, ...), so the
+    title check passes unless a test says otherwise."""
+
+    text = " ".join(f"T{i}" for i in range(50))
+
     def __init__(self) -> None:
         self.closed = False
 
     async def goto(self, url: str, wait_until: str) -> object:
         return type("Response", (), {"status": 200})()
+
+    async def inner_text(self, selector: str, timeout: int) -> str:
+        return self.text
+
+    async def title(self) -> str:
+        return ""
 
     async def close(self) -> None:
         self.closed = True
@@ -190,13 +201,65 @@ def test_a_posting_that_will_not_open_is_counted() -> None:
     asyncio.run(scenario())
 
 
-def test_list_not_sorted_newest_first_is_an_error() -> None:
+def test_a_list_not_sorted_newest_first_skips_old_rows_and_reads_every_page() -> None:
     async def scenario() -> None:
-        nav, _ = make_navigator([answer([row("a1", "2026/10/08"), row("b1", "2026/10/09")])])
-        with pytest.raises(CollectionError, match="sorted"):
-            await nav.next_listing()
+        # Sorted by closing date: an old row comes first and must NOT end collection.
+        page1 = answer([row("old1", "2026/09/01"), row("new1", "2026/10/09"), row("old2", "2026/08/15")], has_more=True)
+        page2 = answer([row("new2", "2026-10-10"), row("old3", "2026/07/01")], has_more=False)
+        nav, calls = make_navigator([page1, page2])
+        assert await drain(nav) == ["new1", "new2"]
+        assert calls == [0, 3]  # kept reading past the old rows
+        assert nav.unsorted and nav.reached_cutoff  # the whole list was read, so the run is clean
 
     asyncio.run(scenario())
+
+
+def test_an_unsorted_list_cut_by_the_page_cap_is_not_clean() -> None:
+    async def scenario() -> None:
+        steps = [answer([row(f"p{i}a", "2026/09/01"), row(f"p{i}b", "2026/10/09")], has_more=True) for i in range(10)]
+        nav, calls = make_navigator(steps)
+        await drain(nav)
+        assert len(calls) == 4 and nav.reached_cutoff is False  # max_list_pages = 4
+
+    asyncio.run(scenario())
+
+
+def test_a_list_whose_rows_are_all_older_than_the_cutoff_is_a_quiet_day_not_a_failure() -> None:
+    async def scenario() -> None:
+        nav, _ = make_navigator([answer([row("a1", "2026/10/01"), row("b1", "2026/09/30")], has_more=True)])
+        assert await drain(nav) == []
+        assert nav.reached_cutoff
+
+    asyncio.run(scenario())
+
+
+def test_a_posting_that_does_not_show_its_row_title_is_a_failed_open() -> None:
+    async def scenario() -> None:
+        class WrongPage(FakePage):
+            text = "Some other tender entirely"
+
+        class WrongContext(FakeContext):
+            async def new_page(self) -> FakePage:
+                page = WrongPage()
+                self.opened.append(page)
+                return page
+
+        nav, _ = make_navigator([answer([row("a1")])], context=WrongContext())
+        assert await drain(nav) == []  # a wrong address the agent built is never stored
+        assert nav.failed_opens == 1
+
+    asyncio.run(scenario())
+
+
+def test_the_title_check_allows_shortened_titles_and_spacing_differences() -> None:
+    from sonar.navigation.dom import shows_title
+
+    class Page(FakePage):
+        text = "Project: tender_21955 - IT Security   Products and Services: Next Gen VOR\nDetails..."
+
+    assert asyncio.run(shows_title(Page(), "IT Security Products and Services: Next…"))
+    assert asyncio.run(shows_title(Page(), ""))  # nothing to check
+    assert not asyncio.run(shows_title(Page(), "Winter Maintenance for the Timmins Area"))
 
 
 def test_without_dates_collection_stops_at_a_page_of_only_known_postings() -> None:

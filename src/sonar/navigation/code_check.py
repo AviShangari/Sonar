@@ -27,13 +27,13 @@ ALLOWED_BUILTINS = {
 }
 ALLOWED_METHODS = {
     "get", "lower", "upper", "strip", "startswith", "endswith", "items", "keys", "values",
-    "append", "split", "join",
+    "append", "split", "join", "isdigit",
 }
 # Read-only DevTools queries (finding elements and where to click). No Runtime.*, no Fetch.*,
 # no Network.*, no Input.* (clicks go through click_at_xy), no Page.navigate.
 ALLOWED_CDP = {
     "Accessibility.enable", "Accessibility.getFullAXTree", "Accessibility.queryAXTree",
-    "DOM.enable", "DOM.getDocument", "DOM.getBoxModel", "Page.getLayoutMetrics",
+    "DOM.enable", "DOM.getDocument", "DOM.getBoxModel", "DOM.describeNode", "Page.getLayoutMetrics",
 }
 
 _ALLOWED_NODES = (

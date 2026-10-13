@@ -22,6 +22,7 @@ from sonar.matching.base import Matcher
 from sonar.matching.run import match_new_listings
 from sonar.models import Decision
 from sonar.navigation.factory import build_navigator
+from sonar.navigation.screenshots import FailureShots
 from sonar.navigation.session import open_browser
 from sonar.sites import SiteConfig
 
@@ -51,21 +52,28 @@ async def collect_site(
     # where it was, so the next run re-reads down to it (known postings are skipped by dedup).
     cutoff = get_watermark(engine, site.name) or date.today() - timedelta(days=days if days is not None else site.first_run_days)
     async with open_browser(site, port=settings.cdp_port, headless=settings.headless) as context:
+        shots = FailureShots(settings.screenshot_path, site.name)
         navigator = build_navigator(
             settings.navigator, site, context, settings.cdp_port,
-            is_seen=lambda job_id: listing_exists(engine, site.name, job_id), cutoff=cutoff,
+            is_seen=lambda job_id: listing_exists(engine, site.name, job_id), cutoff=cutoff, shots=shots,
         )
-        await navigator.login()
-        while (max_new is None or outcome.stored < max_new) and (opened := await navigator.next_listing()):
-            try:
-                add_listing(engine, await extract_listing(site.name, opened), run_id)
-                outcome.stored += 1
-                log.info("site=%s job_id=%s step=store outcome=ok", site.name, opened.job_id)
-            except Exception as exc:  # one bad posting must not stop the site
-                outcome.failed_postings += 1
-                log.warning("site=%s url=%s step=store outcome=failed error=%s", site.name, opened.url, exc)
-            finally:
-                await navigator.close_listing(opened)
+        try:
+            await navigator.login()
+            while (max_new is None or outcome.stored < max_new) and (opened := await navigator.next_listing()):
+                try:
+                    add_listing(engine, await extract_listing(site.name, opened), run_id)
+                    outcome.stored += 1
+                    log.info("site=%s job_id=%s step=store outcome=ok", site.name, opened.job_id)
+                except Exception as exc:  # one bad posting must not stop the site
+                    outcome.failed_postings += 1
+                    log.warning("site=%s url=%s step=store outcome=failed error=%s", site.name, opened.url, exc)
+                    await shots.take(opened.page, "store", opened.job_id)
+                finally:
+                    await navigator.close_listing(opened)
+        except Exception:
+            # The site is failing as a whole (login, list pages): keep a picture of where the browser was.
+            await shots.take_current(context, "site")
+            raise
         outcome.skipped_seen = getattr(navigator, "skipped_seen", 0)
         capped = max_new is not None and outcome.stored >= max_new
         failed_opens = getattr(navigator, "failed_opens", 0)

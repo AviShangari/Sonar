@@ -6,6 +6,7 @@ import pytest
 
 from sonar.navigation.code_check import check_code
 from sonar.navigation.dom import READ_ROWS_RECIPE, CollectionError, DomNavigator, parse_agent_page, parse_date, to_candidates
+from sonar.navigation.screenshots import FailureShots
 from sonar.sites import SiteConfig
 
 SITE = SiteConfig(
@@ -232,3 +233,39 @@ def test_close_listing_closes_the_tab() -> None:
 
 def test_the_recipe_in_the_agent_prompt_passes_the_code_filter() -> None:
     check_code(READ_ROWS_RECIPE)  # raises CodeRejected if the prompt teaches code we would refuse
+
+
+def test_a_posting_that_will_not_open_is_screenshotted_then_closed(tmp_path) -> None:
+    class BlockedPage(FakePage):
+        async def goto(self, url: str, wait_until: str) -> object:
+            return type("Response", (), {"status": 403})()
+
+        def is_closed(self) -> bool:
+            return self.closed
+
+        async def screenshot(self, path: str, timeout: int) -> None:
+            assert not self.closed  # the picture is taken before the tab is closed
+            open(path, "wb").write(b"png")
+
+    class BlockedContext(FakeContext):
+        async def new_page(self) -> FakePage:
+            page = BlockedPage()
+            self.opened.append(page)
+            return page
+
+    async def scenario() -> None:
+        calls: list[int] = []
+
+        async def collect(site: SiteConfig, offset: int) -> str:
+            calls.append(offset)
+            return answer([row("ws1")])
+
+        context = BlockedContext()
+        nav = DomNavigator(
+            SITE, context, collect, is_seen=lambda job_id: False, cutoff=CUTOFF, shots=FailureShots(tmp_path, "demo")  # type: ignore[arg-type]
+        )
+        assert await drain(nav) == []
+        assert nav.failed_opens == 1 and context.opened[0].closed
+        assert len(list(tmp_path.glob("*-demo-open-ws1-*.png"))) == 1
+
+    asyncio.run(scenario())

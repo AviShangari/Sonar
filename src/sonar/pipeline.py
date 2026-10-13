@@ -25,6 +25,7 @@ from sonar.matching.run import match_new_listings
 from sonar.models import Decision
 from sonar.navigation.factory import build_navigator
 from sonar.navigation.guards import GuardState
+from sonar.navigation.route_notes import save_route_note
 from sonar.navigation.screenshots import FailureShots
 from sonar.navigation.session import open_browser
 from sonar.sites import SiteConfig
@@ -40,6 +41,7 @@ class SiteOutcome:
     skipped_seen: int = 0
     failed_postings: int = 0
     decisions: list[Decision] | None = None
+    route_message: str | None = None  # first note, or "route changed", for the run summary
 
     @property
     def matches(self) -> int:
@@ -102,8 +104,13 @@ async def collect_site(
                 "site=%s step=watermark outcome=not_advanced capped=%s cost_limit=%s failed_postings=%d failed_opens=%d reached_cutoff=%s",
                 site.name, capped, cap_hit, outcome.failed_postings, failed_opens, reached_cutoff,
             )
-        elif (newest := newest_listed_date(engine, site.name)) and advance_watermark(engine, site.name, newest):
-            log.info("site=%s step=watermark outcome=advanced to=%s", site.name, newest)
+        else:
+            if (newest := newest_listed_date(engine, site.name)) and advance_watermark(engine, site.name, newest):
+                log.info("site=%s step=watermark outcome=advanced to=%s", site.name, newest)
+            # A clean run found the list the normal way, so its route note is worth keeping.
+            result = save_route_note(settings.route_notes_path, site.name, getattr(navigator, "route_note", None), settings.today())
+            outcome.route_message = result.describe()
+            log.info("site=%s step=route_note outcome=%s", site.name, result.status)
     return outcome
 
 

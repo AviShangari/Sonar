@@ -29,6 +29,12 @@ class Settings(BaseModel):
     screenshot_dir: str = "data/screenshots"  # failure screenshots (gitignored, for people only)
     summaries: bool = True
     summary_workers: int = 4
+    # Cost caps per run (see budget.py). Hitting one ends the run as "partial". None = no limit.
+    max_agent_calls: int | None = 80  # all agent calls in a run: list-page reads plus summaries
+    max_new_per_site: int | None = 100  # new postings stored per site
+    max_summaries: int | None = 40  # summaries written per run
+    max_run_usd: float | None = None  # dollars per run, from the OpenRouter key's spend (auth: openrouter only)
+    max_call_usd: float | None = None  # dollars per agent call, the SDK's own figure (see decision log before trusting it)
     email: bool = False
     smtp_host: str = ""
     smtp_port: int = 587

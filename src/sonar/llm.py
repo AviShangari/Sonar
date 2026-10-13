@@ -11,14 +11,20 @@ The key is read through secrets.py and goes only into the environment of the age
 that the SDK starts. It is never logged and never put in a prompt.
 """
 
+import logging
 from typing import Any, Literal
+
+import httpx
 
 from sonar.config import Settings
 from sonar.secrets import openrouter_api_key
 
+log = logging.getLogger("sonar.llm")
+
 Role = Literal["navigation", "summary"]
 
 OPENROUTER_URL = "https://openrouter.ai/api"
+OPENROUTER_KEY_URL = "https://openrouter.ai/api/v1/key"  # read-only: how much this key has spent
 
 _settings = Settings()  # until main calls configure(): subscription, so tests never touch the network
 
@@ -29,6 +35,21 @@ def configure(settings: Settings) -> None:
     if settings.auth == "openrouter":
         openrouter_api_key()  # raises with a clear message if it is not set
     _settings = settings
+
+
+async def openrouter_usage_usd() -> float | None:
+    """Dollars the OpenRouter key has spent in its lifetime (OpenRouter's own bill), or None when not
+    using OpenRouter or the lookup fails. Reading the cost must never fail a run. Read-only."""
+    if _settings.auth != "openrouter":
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            reply = await client.get(OPENROUTER_KEY_URL, headers={"Authorization": f"Bearer {openrouter_api_key()}"})
+        reply.raise_for_status()
+        return float(reply.json()["data"]["usage"])
+    except Exception as exc:  # the key never appears in the message: httpx errors carry the URL, not headers
+        log.warning("step=cost outcome=usage_lookup_failed error=%s", type(exc).__name__)
+        return None
 
 
 def agent_llm_options(role: Role) -> dict[str, Any]:

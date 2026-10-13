@@ -9,6 +9,8 @@ from datetime import date, timedelta
 
 from sqlalchemy.engine import Engine
 
+from sonar import budget
+from sonar.budget import BudgetExceeded
 from sonar.config import Settings
 from sonar.db.queries import (
     add_listing,
@@ -57,9 +59,16 @@ async def collect_site(
             settings.navigator, site, context, settings.cdp_port,
             is_seen=lambda job_id: listing_exists(engine, site.name, job_id), cutoff=cutoff, shots=shots,
         )
+        site_cap = budget.current.max_new_per_site
+        cap_hit = False  # stopped by a cost limit (not by the test cap): the run is then partial
         try:
             await navigator.login()
             while (max_new is None or outcome.stored < max_new) and (opened := await navigator.next_listing()):
+                if site_cap is not None and outcome.stored >= site_cap:
+                    cap_hit = True  # an opened posting is waiting; close it unread and stop this site
+                    budget.current.note_hit(f"posts:{site.name}", f"{site.name}: limit of {site_cap} new postings reached")
+                    await navigator.close_listing(opened)
+                    break
                 try:
                     add_listing(engine, await extract_listing(site.name, opened), run_id)
                     outcome.stored += 1
@@ -70,6 +79,8 @@ async def collect_site(
                     await shots.take(opened.page, "store", opened.job_id)
                 finally:
                     await navigator.close_listing(opened)
+        except BudgetExceeded:
+            cap_hit = True  # a run-wide limit ended this site early; it was noted where it was hit
         except Exception:
             # The site is failing as a whole (login, list pages): keep a picture of where the browser was.
             await shots.take_current(context, "site")
@@ -78,10 +89,10 @@ async def collect_site(
         capped = max_new is not None and outcome.stored >= max_new
         failed_opens = getattr(navigator, "failed_opens", 0)
         reached_cutoff = getattr(navigator, "reached_cutoff", True)
-        if capped or outcome.failed_postings or failed_opens or not reached_cutoff:
+        if capped or cap_hit or outcome.failed_postings or failed_opens or not reached_cutoff:
             log.warning(
-                "site=%s step=watermark outcome=not_advanced capped=%s failed_postings=%d failed_opens=%d reached_cutoff=%s",
-                site.name, capped, outcome.failed_postings, failed_opens, reached_cutoff,
+                "site=%s step=watermark outcome=not_advanced capped=%s cost_limit=%s failed_postings=%d failed_opens=%d reached_cutoff=%s",
+                site.name, capped, cap_hit, outcome.failed_postings, failed_opens, reached_cutoff,
             )
         elif (newest := newest_listed_date(engine, site.name)) and advance_watermark(engine, site.name, newest):
             log.info("site=%s step=watermark outcome=advanced to=%s", site.name, newest)

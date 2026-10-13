@@ -42,6 +42,7 @@ src/sonar/
   llm.py           the ONLY place LLM auth and model choice are configured
   models.py        Pydantic schemas (Listing, Decision, Summary, RunLog)
   db/              tables and queries
+  budget.py        cost caps for one run (counts and dollars)
   agent_runner.py  the ONLY place the Agent SDK and browser-use CLI are invoked (swappable)
   navigation/      base.py (interface), dom.py, vision.py, tools.py (browser(code) tool), code_check.py (validates agent code), guards.py (browser request guards), session.py
   extraction/      posting text extraction

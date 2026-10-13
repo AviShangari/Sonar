@@ -3,7 +3,7 @@ SONAR REPORT
 Run {{ report.run_id }}  |  {{ report.started_at }}  |  matcher: {{ report.matcher }}
 
 {% if report.failed_sites %}
-!! {{ "SOME SITES COULD NOT BE CHECKED" if report.status == "partial" else "THIS RUN FAILED" }}
+!! {{ "THIS RUN WAS INCOMPLETE" if report.status == "partial" else "THIS RUN FAILED" }}
 {{ report.failed_sites|wrap("   ") }}
 
 {% endif %}

@@ -2,7 +2,7 @@ SONAR: {{ report.matches|length }} {{ "match" if report.matches|length == 1 else
 {{ report.new_postings }} new postings found | {{ report.scored }} checked
 {% if report.failed_sites %}
 
-!! {{ "SOME SITES COULD NOT BE CHECKED" if report.status == "partial" else "THIS RUN FAILED" }}
+!! {{ "THIS RUN WAS INCOMPLETE" if report.status == "partial" else "THIS RUN FAILED" }}
 {{ report.failed_sites|wrap("") }}
 {% endif %}
 {% for m in report.matches %}

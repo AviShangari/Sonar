@@ -14,6 +14,11 @@
 #   screenshot_dir: where a screenshot is saved when navigation fails (inside data/, never committed)
 #   summaries:     true: an agent writes a short summary for each match (needs the Claude login)
 #   summary_workers: how many summary agents run at the same time (each is a separate process)
+#   max_agent_calls / max_new_per_site / max_summaries: cost caps per run (all agent calls; new postings per site; summaries).
+#                  Hitting one ends the run as "partial", the email says which, and a cut-short site keeps its watermark. Blank = no limit
+#   max_run_usd:   dollar cap per run, read from the OpenRouter key's spend (auth: openrouter only). OpenRouter updates spend with a
+#                  delay of several seconds, so the run can overshoot by about one call. Blank = no limit
+#   max_call_usd:  the SDK's own dollar cap per agent call. Its figure is exact for Sonnet but about 2x too high for GPT-6.1 Sol, so it errs toward stopping early
 #   email:         true: send the report (HTML table plus a plain-text copy) by SMTP after each run. The password is NOT here:
 #                  put SONAR_SMTP_PASSWORD=... in the gitignored .env file (read only by secrets.py)
 #   smtp_host / smtp_port: the mail server (587 = STARTTLS, 465 = TLS)
@@ -33,7 +38,12 @@ cdp_port: 9333
 report_dir: data/reports
 screenshot_dir: data/screenshots
 summaries: true
-summary_workers: 4
+summary_workers: 3
+max_agent_calls:
+max_new_per_site:
+max_summaries:
+max_run_usd: 5
+max_call_usd:
 email: false
 smtp_host: smtp.gmail.com
 smtp_port: 587

@@ -12,6 +12,7 @@ import sys
 
 from sqlalchemy.engine import Engine
 
+from sonar import llm
 from sonar.config import Settings, load_settings
 from sonar.db.queries import fail_stale_runs, finish_run, start_run
 from sonar.db.tables import make_engine
@@ -33,10 +34,15 @@ def run_status(outcomes: list[SiteOutcome]) -> str:
 
 
 async def run(site_name: str | None, days: int | None, max_new: int | None) -> int:
-    for var in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"):
-        if os.environ.get(var):
-            sys.exit(f"{var} is set; unset it so the run uses your subscription login.")
     settings = load_settings()
+    if settings.auth == "subscription":
+        for var in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"):
+            if os.environ.get(var):
+                sys.exit(f"{var} is set; unset it so the run uses your subscription login (or set auth: openrouter).")
+    try:
+        llm.configure(settings)  # fails before anything starts if the API key is missing
+    except RuntimeError as exc:
+        sys.exit(str(exc))
     sites = [s for s in load_sites() if site_name in (None, s.name)]
     if not sites:
         sys.exit(f"no site named '{site_name}' in config/sites.yaml")

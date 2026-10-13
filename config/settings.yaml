@@ -1,4 +1,8 @@
 # Mode flags and run settings. Read by src/sonar/config.py.
+#   auth:          subscription (your Claude login, for development) or openrouter (API key, for scheduled runs).
+#                  The key goes in the gitignored .env as OPENROUTER_API_KEY, never here (read only by secrets.py)
+#   navigation_model / navigation_effort: model and reasoning effort of the browsing agent (auth: openrouter only)
+#   summary_model: model that writes the summaries (auth: openrouter only)
 #   navigator:     dom (built) or vision (not built yet)
 #   matcher:       keywords (built) or jev (not built yet)
 #   database_url:  where listings and decisions are stored
@@ -15,6 +19,10 @@
 #   smtp_host / smtp_port: the mail server (587 = STARTTLS, 465 = TLS)
 #   smtp_username: login name; blank means use email_from
 #   email_from / email_to: sender and the one recipient
+auth: subscription
+navigation_model: openai/gpt-6.1-sol
+navigation_effort: medium
+summary_model: anthropic/claude-sonnet-5.5
 navigator: dom
 matcher: keywords
 database_url: "sqlite:///data/sonar.db"

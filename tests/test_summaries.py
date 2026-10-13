@@ -109,7 +109,7 @@ def test_summary_appears_in_html_and_text_reports(setup) -> None:
 
 
 def test_runtime_agents_load_nothing_from_disk_and_have_no_tools() -> None:
-    options = isolated_options("system", 2)
+    options = isolated_options("system", 2, "summary")
     assert options.setting_sources == [] and options.tools == []
     assert options.env == {"ENABLE_CLAUDEAI_MCP_SERVERS": "false"}
     assert options.system_prompt == "system"

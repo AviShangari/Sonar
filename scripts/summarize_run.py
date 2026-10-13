@@ -7,6 +7,7 @@ Run:  .venv\Scripts\python.exe scripts/summarize_run.py RUN_ID [--redo]
 import argparse
 import asyncio
 
+from sonar import llm
 from sonar.config import load_settings
 from sonar.db.tables import make_engine
 from sonar.summarize.summaries import summarize_matches
@@ -17,6 +18,7 @@ parser.add_argument("--redo", action="store_true", help="read postings again eve
 args = parser.parse_args()
 
 settings = load_settings()
+llm.configure(settings)
 engine = make_engine(settings.database_url)
 count = asyncio.run(summarize_matches(engine, args.run_id, settings.matcher, workers=settings.summary_workers, redo=args.redo))
 print(f"read {count} postings")

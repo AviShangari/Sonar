@@ -39,7 +39,7 @@ src/sonar/
   main.py          entry point
   config.py        settings loading
   secrets.py       the ONLY place secrets are read
-  llm.py           the ONLY place LLM auth is configured
+  llm.py           the ONLY place LLM auth and model choice are configured
   models.py        Pydantic schemas (Listing, Decision, Summary, RunLog)
   db/              tables and queries
   agent_runner.py  the ONLY place the Agent SDK and browser-use CLI are invoked (swappable)
@@ -108,7 +108,12 @@ The Agent SDK can load `CLAUDE.md`, skills and settings from the project's `.cla
 
 ## Auth
 
-Development uses the developer's Claude subscription login. API key support (and possibly Microsoft Foundry) must be added in `llm.py` before deployment or any scheduled run. Never hardcode auth anywhere else.
+`config/settings.yaml` `auth` picks one of two modes, and `llm.py` is the only place that applies it:
+
+- `subscription` (development): the developer's Claude login; no model is set.
+- `openrouter` (scheduled runs): an OpenRouter API key, read from `OPENROUTER_API_KEY` through `secrets.py`. OpenRouter is Anthropic-compatible, so the Agent SDK is pointed at it with `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` and an empty `ANTHROPIC_API_KEY`. Models are pinned per role in settings: `navigation_model` (+ `navigation_effort`) for the browsing agent, `summary_model` for summaries.
+
+A scheduled run must use `openrouter` (enforce this when the scheduler is built). Never hardcode auth, keys or model names anywhere else. Microsoft Foundry could be added inside `llm.py` if the company requires it.
 
 ## Workflow
 

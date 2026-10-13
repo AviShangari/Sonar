@@ -13,6 +13,10 @@ DEFAULT_PATH = ROOT / "config" / "settings.yaml"
 
 
 class Settings(BaseModel):
+    auth: Literal["subscription", "openrouter"] = "subscription"  # see llm.py
+    navigation_model: str = "openai/gpt-6.1-sol"  # used only with auth: openrouter
+    navigation_effort: Literal["low", "medium", "high", "xhigh", "max"] | None = "medium"
+    summary_model: str = "anthropic/claude-sonnet-5.5"  # used only with auth: openrouter
     navigator: Literal["dom", "vision"] = "dom"
     matcher: Literal["keywords", "jev"] = "keywords"
     database_url: str = "sqlite:///data/sonar.db"

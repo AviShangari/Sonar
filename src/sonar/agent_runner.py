@@ -22,6 +22,7 @@ from claude_agent_sdk import (
     tool,
 )
 
+from sonar.llm import Role, agent_llm_options
 from sonar.navigation.code_check import CodeRejected, check_code
 from sonar.navigation.session import DATA_DIR
 
@@ -93,7 +94,7 @@ async def run_browser_agent(
         return {"content": [{"type": "text", "text": await run_cli(port, code)}]}
 
     options = isolated_options(
-        system_prompt, max_turns,
+        system_prompt, max_turns, "navigation",
         mcp_servers={"browser": create_sdk_mcp_server("browser", tools=[browser_tool])},
         allowed_tools=["mcp__browser__browser"],
     )
@@ -103,20 +104,22 @@ async def run_browser_agent(
 async def run_text_agent(system_prompt: str, task: str, max_turns: int = 2, timeout_s: int = 120) -> str:
     """Run an agent with NO tools (it can only answer in text) and return its answer.
     Raises AgentError on any failure."""
-    return await run_query(task, isolated_options(system_prompt, max_turns), timeout_s)
+    return await run_query(task, isolated_options(system_prompt, max_turns, "summary"), timeout_s)
 
 
-def isolated_options(system_prompt: str, max_turns: int, **extra) -> ClaudeAgentOptions:
+def isolated_options(system_prompt: str, max_turns: int, role: Role, **extra) -> ClaudeAgentOptions:
     """Runtime agents load no CLAUDE.md, skills, settings or claude.ai connectors, run outside the
-    repo, and get no built-in tools (no Bash, no file access). Only what we pass is available."""
+    repo, and get no built-in tools (no Bash, no file access). Only what we pass is available.
+    Model, effort and auth come from llm.py, by the agent's role."""
+    llm = agent_llm_options(role)
     return ClaudeAgentOptions(
         cwd=tempfile.mkdtemp(prefix="sonar-agent-"),
         setting_sources=[],
         tools=[],
         extra_args={"strict-mcp-config": None},
-        env={"ENABLE_CLAUDEAI_MCP_SERVERS": "false"},
         system_prompt=system_prompt,
         max_turns=max_turns,
+        **{**llm, "env": {"ENABLE_CLAUDEAI_MCP_SERVERS": "false", **llm.get("env", {})}},
         **extra,
     )
 

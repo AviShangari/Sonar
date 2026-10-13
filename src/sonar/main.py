@@ -128,6 +128,8 @@ def print_summary(run_id: int, status: str, outcomes: list[SiteOutcome]) -> None
             f"  {o.site}: {o.stored} new stored, {o.skipped_seen} already known, {o.failed_postings} failed, "
             f"{len(o.decisions or [])} scored, {o.matches} matches"
         )
+        if o.route_message:
+            print(f"    {o.route_message}")
 
 
 if __name__ == "__main__":

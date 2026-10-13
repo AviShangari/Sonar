@@ -27,6 +27,7 @@ class Settings(BaseModel):
     report_dir: str = "data/reports"
     lock_dir: str = "data"  # holds the run lock file
     screenshot_dir: str = "data/screenshots"  # failure screenshots (gitignored, for people only)
+    route_notes_dir: str = "data/route-notes"  # how the agent reached each site's list (gitignored, for people only)
     summaries: bool = True
     summary_workers: int = 4
     # Cost caps per run (see budget.py). Hitting one ends the run as "partial". None = no limit.
@@ -70,6 +71,10 @@ class Settings(BaseModel):
     @property
     def screenshot_path(self) -> Path:
         return ROOT / self.screenshot_dir
+
+    @property
+    def route_notes_path(self) -> Path:
+        return ROOT / self.route_notes_dir
 
     @property
     def keywords_path(self) -> Path:

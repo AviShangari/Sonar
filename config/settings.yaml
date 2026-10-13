@@ -12,6 +12,7 @@
 #   cdp_port:      remote-debugging port of the dedicated browser
 #   report_dir:    where each run's report files (.html and .txt) are written
 #   screenshot_dir: where a screenshot is saved when navigation fails (inside data/, never committed)
+#   route_notes_dir: where the agent's note on how it reached each site's list is kept (one line per change; inside data/, never committed)
 #   summaries:     true: an agent writes a short summary for each match (needs the Claude login)
 #   summary_workers: how many summary agents run at the same time (each is a separate process)
 #   max_agent_calls / max_new_per_site / max_summaries: cost caps per run (all agent calls; new postings per site; summaries).
@@ -37,6 +38,7 @@ headless: false
 cdp_port: 9333
 report_dir: data/reports
 screenshot_dir: data/screenshots
+route_notes_dir: data/route-notes
 summaries: true
 summary_workers: 3
 max_agent_calls:

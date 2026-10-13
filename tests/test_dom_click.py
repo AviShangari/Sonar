@@ -228,3 +228,34 @@ def test_after_one_refused_address_the_rest_are_opened_by_clicking_first(base) -
     httpd.shutdown()
     assert [t.split("posting number ")[1][:1] for t in texts] == ["0", "1", "2"]  # all three read, the right ones
     assert attempts == ["/p/0"]  # only the FIRST posting tried the address; the other two went straight to clicking
+
+
+def test_rows_that_all_carry_the_list_pages_own_address_stay_separate_and_get_their_ids_from_the_click(base) -> None:
+    """The agent sometimes returns the list page's address for every row (no posting ID in it). The rows must
+    not collapse into one, and each posting's ID must come from the address the browser is on after the click."""
+    from datetime import date
+
+    rows = [{"title": TITLES[i], "url": f"{base}/list", "date": "2026-10-09"} for i in range(3)]
+    site = SiteConfig(name="demo", start_url=base + "/list", allowed_hosts=["127.0.0.1"])
+
+    async def collect(site, offset):
+        return json.dumps({"links": rows, "has_more": False})
+
+    async def scenario(seen_ids: set[str]):
+        async with async_playwright() as pw:
+            browser = await pw.chromium.launch(headless=True)
+            context = await browser.new_context()
+            await (await context.new_page()).goto(base + "/list")
+            nav = DomNavigator(site, context, collect, is_seen=lambda j: j in seen_ids, cutoff=date(2026, 10, 1))
+            out = []
+            while (opened := await nav.next_listing()):
+                out.append((opened.job_id, opened.url.rsplit("/", 1)[-1]))
+                await nav.close_listing(opened)
+            await browser.close()
+            return out, nav.skipped_seen, nav.failed_opens
+
+    out, skipped, failed = asyncio.run(scenario(set()))
+    # "/list" typed in a new tab loads fine and does not show the title, so each row falls back to its click
+    assert [o[0] for o in out] == ["0", "1", "2"] and failed == 0  # three rows, three IDs read after the click
+    out, skipped, _ = asyncio.run(scenario({"1"}))  # posting 1 is already stored: found out only after opening
+    assert [o[0] for o in out] == ["0", "2"] and skipped == 1

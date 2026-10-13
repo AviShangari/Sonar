@@ -96,7 +96,7 @@ def test_a_capped_run_leaves_the_watermark_so_older_postings_are_not_skipped(eng
     # The next run starts from the first-run window again, not from 10-09, so b and c are still reachable.
     wire["navigator"] = FakeNavigator([("a", "2026-10-09"), ("b", "2026-10-05"), ("c", "2026-10-04")])
     collect(engine)
-    assert wire["cutoffs"][1] == date.today() - timedelta(days=3)
+    assert wire["cutoffs"][1] == Settings().today() - timedelta(days=3)
     assert all(queries.listing_exists(engine, "demo", j) for j in "abc")
 
 

@@ -1,4 +1,4 @@
-"""Sends the plain-text report by email over SMTP (stdlib only). Delivery is separate from the report itself."""
+"""Sends the report by email (HTML table plus a plain-text copy) over SMTP (stdlib only). Delivery is separate from the report itself."""
 
 import smtplib
 import ssl
@@ -6,7 +6,7 @@ from email.message import EmailMessage
 
 from sonar.config import Settings
 from sonar.models import Report
-from sonar.report.render import render_email_text
+from sonar.report.render import render_email_html, render_email_text
 from sonar.secrets import smtp_password
 
 SMTP_TIMEOUT_SECONDS = 30
@@ -23,7 +23,8 @@ def build_message(report: Report, settings: Settings) -> EmailMessage:
     message["Subject"] = subject
     message["From"] = settings.email_from
     message["To"] = settings.email_to
-    message.set_content(render_email_text(report, settings.email_snippets))
+    message.set_content(render_email_text(report))  # plain-text copy, for mail apps that cannot show HTML
+    message.add_alternative(render_email_html(report), subtype="html")
     return message
 
 

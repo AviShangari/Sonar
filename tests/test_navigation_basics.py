@@ -72,3 +72,23 @@ def test_headless_browser_does_not_announce_itself_as_headless() -> None:
     agent = asyncio.run(scenario())
     assert "Chrome/" in agent
     assert "Headless" not in agent
+
+
+def test_timezone_setting_defaults_to_toronto_and_today_follows_it() -> None:
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from sonar.config import Settings
+
+    assert Settings().timezone == "America/Toronto"
+    assert Settings(timezone="Pacific/Kiritimati").today() == datetime.now(ZoneInfo("Pacific/Kiritimati")).date()  # UTC+14
+
+
+def test_an_unknown_timezone_is_rejected_at_startup() -> None:
+    import pytest
+    from pydantic import ValidationError
+
+    from sonar.config import Settings
+
+    with pytest.raises(ValidationError):
+        Settings(timezone="Mars/Olympus")

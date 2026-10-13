@@ -8,30 +8,14 @@ SONAR: {{ report.matches|length }} {{ "match" if report.matches|length == 1 else
 {% for m in report.matches %}
 
 {{ loop.index }}. {{ m.title }}
-{{ m.url }}
-{{ m.site }}
-
+Link: {{ m.url }}
 Date posted: {{ m.posted_date or m.listed_date or "not found, please verify" }}
-Date due: {{ m.closing_date or "not available" }}
-
-Keyword matches: {{ m.hits|sum(attribute="count") }} {{ "mention" if m.hits|sum(attribute="count") == 1 else "mentions" }}, {{ m.hits|length }} different {{ "keyword" if m.hits|length == 1 else "keywords" }}
-Keywords: {% for hit in m.hits %}{{ hit.keyword }} ({{ hit.count }}){{ ", " if not loop.last }}{% endfor %}
-
-{% if m.summary %}
-
-{{ m.summary|wrap("    ") }}
-{% endif %}
-{% if m.how_to_apply %}
-
-{{ ("How to apply: " ~ m.how_to_apply)|wrap("") }}
-{% endif %}
-{% if snippets and m.hits %}
-
-{{ ('Snippet: "' ~ m.hits[0].snippet ~ '"')|wrap("") }}
-{% if m.hits|length > 1 %}
-(+{{ m.hits|length - 1 }} more)
-{% endif %}
-{% endif %}
+Supply arrangement: {{ m.supply_arrangement or "not available" }}
+Solicitation number: {{ m.solicitation_number or "not available" }}
+Issuing department: {{ m.department or "not available" }}
+Due date: {{ m.closing_date or "not available" }}
+Description:
+{{ (m.summary or "Summary not available")|wrap("    ") }}
 {% else %}
 
 No new postings matched your keywords in this run.

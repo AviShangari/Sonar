@@ -52,9 +52,14 @@ def render_text(report: Report) -> str:
     return _environment().get_template("report.txt").render(report=report, width=TEXT_WIDTH)
 
 
-def render_email_text(report: Report, snippets: bool = True) -> str:
-    """The plain-text email body: per match title, summary, link and keyword counts."""
-    return _environment().get_template("email.txt").render(report=report, snippets=snippets)
+def render_email_text(report: Report) -> str:
+    """The plain-text copy of the email: per match the table's fields as labelled lines, plus the link."""
+    return _environment().get_template("email.txt").render(report=report)
+
+
+def render_email_html(report: Report) -> str:
+    """The HTML email: one table row per match. Inline styles only, because mail apps drop <style>."""
+    return _environment().get_template("email.html").render(report=report)
 
 
 def write_report(report: Report, out_dir: Path) -> list[Path]:

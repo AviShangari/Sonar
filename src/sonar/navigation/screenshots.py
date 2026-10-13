@@ -10,6 +10,7 @@ and returns None instead of raising.
 import logging
 import re
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 from playwright.async_api import BrowserContext, Page
@@ -28,17 +29,18 @@ def _safe(text: str | None) -> str:
 class FailureShots:
     """One per site per run. Remembers how many it has taken and stops at `limit`."""
 
-    def __init__(self, directory: Path, site: str, limit: int = DEFAULT_LIMIT) -> None:
+    def __init__(self, directory: Path, site: str, limit: int = DEFAULT_LIMIT, tz: ZoneInfo | None = None) -> None:
         self.directory = directory
         self.site = site
         self.limit = limit
+        self.tz = tz or timezone.utc  # the business time zone, so file names match the clock people use
         self.taken = 0
 
     def _next_path(self, step: str, job_id: str | None) -> Path | None:
         if self.taken >= self.limit:
             log.warning("site=%s step=screenshot outcome=limit_reached limit=%d", self.site, self.limit)
             return None
-        stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        stamp = datetime.now(self.tz).strftime("%Y%m%d-%H%M%S")
         # The counter keeps two failures in the same second from overwriting each other.
         parts = [stamp, _safe(self.site), _safe(step), _safe(job_id), str(self.taken + 1)]
         return self.directory / ("-".join(p for p in parts if p) + ".png")

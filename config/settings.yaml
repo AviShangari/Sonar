@@ -6,6 +6,7 @@
 #   headless:      false shows the browser window. Headless mode sends a normal (non-"Headless") user agent, because CanadaBuys returns 403 to "HeadlessChrome".
 #   cdp_port:      remote-debugging port of the dedicated browser
 #   report_dir:    where each run's report files (.html and .txt) are written
+#   screenshot_dir: where a screenshot is saved when navigation fails (inside data/, never committed)
 #   summaries:     true: an agent writes a short summary for each match (needs the Claude login)
 #   summary_workers: how many summary agents run at the same time (each is a separate process)
 #   email:         true: send the plain-text report by SMTP after each run. The password is NOT here:
@@ -21,6 +22,7 @@ keywords_file: config/keywords.yaml
 headless: false
 cdp_port: 9333
 report_dir: data/reports
+screenshot_dir: data/screenshots
 summaries: true
 summary_workers: 4
 email: false

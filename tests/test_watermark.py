@@ -60,7 +60,7 @@ def wire(monkeypatch, engine):
     async def fake_browser(site, port, headless):
         yield object()
 
-    def fake_build_navigator(mode, site, context, port, is_seen, cutoff):
+    def fake_build_navigator(mode, site, context, port, is_seen, cutoff, shots=None):
         state["cutoffs"].append(cutoff)
         return state["navigator"]
 

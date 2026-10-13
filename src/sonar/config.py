@@ -19,6 +19,7 @@ class Settings(BaseModel):
     cdp_port: int = 9333
     report_dir: str = "data/reports"
     lock_dir: str = "data"  # holds the run lock file
+    screenshot_dir: str = "data/screenshots"  # failure screenshots (gitignored, for people only)
     summaries: bool = True
     summary_workers: int = 4
     email: bool = False
@@ -36,6 +37,10 @@ class Settings(BaseModel):
     @property
     def lock_path(self) -> Path:
         return ROOT / self.lock_dir
+
+    @property
+    def screenshot_path(self) -> Path:
+        return ROOT / self.screenshot_dir
 
     @property
     def keywords_path(self) -> Path:

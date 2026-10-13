@@ -23,6 +23,7 @@ from pydantic import BaseModel, ValidationError
 
 from sonar.agent_runner import run_browser_agent
 from sonar.navigation.base import OpenedListing
+from sonar.navigation.screenshots import FailureShots
 from sonar.navigation.urls import job_id_from_url, normalize_url
 from sonar.sites import SiteConfig
 
@@ -174,12 +175,14 @@ class DomNavigator:
         collect: Collector,
         is_seen: Callable[[str], bool],
         cutoff: date,
+        shots: FailureShots | None = None,
     ) -> None:
         self.site = site
         self.context = context
         self.collect = collect
         self.is_seen = is_seen
         self.cutoff = cutoff
+        self.shots = shots  # saves a screenshot when a posting will not open
         self._queue: list[Candidate] | None = None  # None until the list pages are read
         self.skipped_seen = 0
         self.failed_opens = 0  # postings that would not open; the run is then not "clean"
@@ -247,6 +250,8 @@ class DomNavigator:
             except Exception as exc:  # one bad posting must not stop the site
                 log.warning("site=%s job_id=%s step=open outcome=failed error=%s", self.site.name, cand.job_id, exc)
                 self.failed_opens += 1
+                if self.shots:
+                    await self.shots.take(page, "open", cand.job_id)
                 await page.close()
                 continue
             return OpenedListing(job_id=cand.job_id, url=cand.url, page=page, listed_date=cand.listed_date)

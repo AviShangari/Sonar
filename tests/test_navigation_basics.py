@@ -49,14 +49,50 @@ def test_normalize_url_strips_query_fragment_and_resolves_relative_links() -> No
         ("https://site.com/bids/view?NoticeID=A-5", "A-5"),
         ("https://canadabuys.canada.ca/en/tender-opportunities", None),
         ("https://site.com/", None),
+        ("https://ontariotenders.app.jaggaer.com/esop/toolkit/opportunity/current/120400/detail.si", "120400"),
+        ("https://canadabuys.canada.ca/en/tender-opportunities/tender-notice/cb-428-37324676", "cb-428-37324676"),
     ],
 )
 def test_job_id_from_url(url: str, expected: str | None) -> None:
     assert job_id_from_url(url) == expected
 
 
+def test_hosts_can_carry_their_own_hints() -> None:
+    from sonar.sites import SiteConfig
+
+    site = SiteConfig(
+        name="x", start_url="https://a.example.com/",
+        allowed_hosts=["a.example.com", {"host": "b.example.com", "hint": "the list is under Tenders"}],
+        hint="whole-site tip",
+    )
+    assert site.allowed_hosts == ["a.example.com", "b.example.com"]  # the guard still gets plain host names
+    assert site.host_hints == {"b.example.com": "the list is under Tenders"}
+    text = site.hints_text()
+    assert "whole-site tip" in text and "About b.example.com: the list is under Tenders" in text
+    assert "trust the page" in text  # hints can go stale
+
+
+def test_no_hints_means_no_hint_text() -> None:
+    from sonar.sites import SiteConfig
+
+    assert SiteConfig(name="x", start_url="https://a.example.com/", allowed_hosts=["a.example.com"]).hints_text() == ""
+
+
+def test_a_hint_for_a_host_that_is_not_allowed_is_rejected() -> None:
+    from sonar.sites import SiteConfig
+
+    with pytest.raises(ValueError, match="not allowed"):
+        SiteConfig(name="x", start_url="https://a.example.com/", allowed_hosts=["a.example.com"], host_hints={"evil.example.org": "x"})
+
+
+def test_the_real_sites_file_loads() -> None:
+    from sonar.sites import load_sites
+
+    assert {s.name for s in load_sites()} >= {"canadabuys", "ontariotenders"}
+
+
 def test_sites_config_loads() -> None:
-    (site,) = load_sites()
+    site = load_sites()[0]
     assert site.name == "canadabuys"
     assert site.allowed_hosts == ["canadabuys.canada.ca"]
     assert site.requires_login is False

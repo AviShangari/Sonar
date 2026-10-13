@@ -10,7 +10,13 @@ from datetime import date, timedelta
 from sqlalchemy.engine import Engine
 
 from sonar.config import Settings
-from sonar.db.queries import add_listing, listing_exists, newest_listed_date
+from sonar.db.queries import (
+    add_listing,
+    advance_watermark,
+    get_watermark,
+    listing_exists,
+    newest_listed_date,
+)
 from sonar.extraction.posting import extract_listing
 from sonar.matching.base import Matcher
 from sonar.matching.run import match_new_listings
@@ -41,7 +47,9 @@ async def collect_site(
 ) -> SiteOutcome:
     """Navigate one site and store its new postings. `max_new` is a test cap, not for real runs."""
     outcome = SiteOutcome(site.name)
-    cutoff = newest_listed_date(engine, site.name) or date.today() - timedelta(days=days if days is not None else site.first_run_days)
+    # The stop point is the watermark, which only a clean run moves. A capped or failed run leaves it
+    # where it was, so the next run re-reads down to it (known postings are skipped by dedup).
+    cutoff = get_watermark(engine, site.name) or date.today() - timedelta(days=days if days is not None else site.first_run_days)
     async with open_browser(site, port=settings.cdp_port, headless=settings.headless) as context:
         navigator = build_navigator(
             settings.navigator, site, context, settings.cdp_port,
@@ -59,6 +67,16 @@ async def collect_site(
             finally:
                 await navigator.close_listing(opened)
         outcome.skipped_seen = getattr(navigator, "skipped_seen", 0)
+        capped = max_new is not None and outcome.stored >= max_new
+        failed_opens = getattr(navigator, "failed_opens", 0)
+        reached_cutoff = getattr(navigator, "reached_cutoff", True)
+        if capped or outcome.failed_postings or failed_opens or not reached_cutoff:
+            log.warning(
+                "site=%s step=watermark outcome=not_advanced capped=%s failed_postings=%d failed_opens=%d reached_cutoff=%s",
+                site.name, capped, outcome.failed_postings, failed_opens, reached_cutoff,
+            )
+        elif (newest := newest_listed_date(engine, site.name)) and advance_watermark(engine, site.name, newest):
+            log.info("site=%s step=watermark outcome=advanced to=%s", site.name, newest)
     return outcome
 
 

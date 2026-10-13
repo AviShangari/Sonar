@@ -44,6 +44,17 @@ class ListingRow(Base):
     first_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
+class SiteWatermarkRow(Base):
+    """Per site: everything listed up to and including this date has been collected (set only by a clean run).
+    The next run uses it as its stop line: it reads newest first and stops at the first row dated before it."""
+
+    __tablename__ = "site_watermarks"
+
+    site: Mapped[str] = mapped_column(primary_key=True)
+    listed_date: Mapped[str]  # ISO date, as in listings.fields["listed_date"]
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
 class DecisionRow(Base):
     __tablename__ = "decisions"
 

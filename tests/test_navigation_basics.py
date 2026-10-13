@@ -1,6 +1,9 @@
+import asyncio
+
 import pytest
 
 from sonar.navigation.guards import is_allowed
+from sonar.navigation.session import open_browser
 from sonar.navigation.urls import job_id_from_url, normalize_url
 from sonar.sites import load_sites
 
@@ -57,3 +60,15 @@ def test_sites_config_loads() -> None:
     assert site.name == "canadabuys"
     assert site.allowed_hosts == ["canadabuys.canada.ca"]
     assert site.requires_login is False
+
+
+def test_headless_browser_does_not_announce_itself_as_headless() -> None:
+    # CanadaBuys answers 403 to a "HeadlessChrome" user agent.
+    async def scenario() -> str:
+        async with open_browser(load_sites()[0], port=9444, headless=True) as context:
+            page = await context.new_page()
+            return str(await page.evaluate("navigator.userAgent"))
+
+    agent = asyncio.run(scenario())
+    assert "Chrome/" in agent
+    assert "Headless" not in agent

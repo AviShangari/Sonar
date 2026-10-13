@@ -62,6 +62,17 @@ def test_finish_run_records_status(engine) -> None:
         assert run.status == "ok" and run.finished_at is not None
 
 
+def test_watermark_starts_empty_and_only_moves_forward(engine) -> None:
+    assert queries.get_watermark(engine, "siteA") is None
+    assert queries.advance_watermark(engine, "siteA", date(2026, 10, 9)) is True
+    assert queries.advance_watermark(engine, "siteA", date(2026, 10, 7)) is False  # never back
+    assert queries.advance_watermark(engine, "siteA", date(2026, 10, 9)) is False  # same day: no change
+    assert queries.get_watermark(engine, "siteA") == date(2026, 10, 9)
+    assert queries.advance_watermark(engine, "siteA", date(2026, 10, 10)) is True
+    assert queries.get_watermark(engine, "siteA") == date(2026, 10, 10)
+    assert queries.get_watermark(engine, "siteB") is None  # per site
+
+
 def test_newest_listed_date_is_the_latest_date_for_that_site(engine) -> None:
     run_id = queries.start_run(engine)
     assert queries.newest_listed_date(engine, "siteA") is None

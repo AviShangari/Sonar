@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
-from sonar.db.tables import DecisionRow, ListingRow, RunRow, utcnow
+from sonar.db.tables import DecisionRow, ListingRow, RunRow, SiteWatermarkRow, utcnow
 from sonar.models import Decision, Listing
 
 
@@ -75,6 +75,27 @@ def newest_listed_date(engine: Engine, site: str) -> date | None:
             select(func.max(ListingRow.fields["listed_date"].as_string())).where(ListingRow.site == site)
         )
     return date.fromisoformat(value) if value else None
+
+
+def get_watermark(engine: Engine, site: str) -> date | None:
+    """The date up to which a clean run has collected everything (the stop point for the next run)."""
+    with Session(engine) as session:
+        row = session.get(SiteWatermarkRow, site)
+        return date.fromisoformat(row.listed_date) if row else None
+
+
+def advance_watermark(engine: Engine, site: str, new: date) -> bool:
+    """Move a site's watermark forward to `new`. It never moves back. Returns True if it changed."""
+    with Session(engine) as session:
+        row = session.get(SiteWatermarkRow, site)
+        if row is None:
+            session.add(SiteWatermarkRow(site=site, listed_date=new.isoformat()))
+        elif date.fromisoformat(row.listed_date) < new:
+            row.listed_date, row.updated_at = new.isoformat(), utcnow()
+        else:
+            return False
+        session.commit()
+        return True
 
 
 def add_listing(engine: Engine, listing: Listing, run_id: int) -> int:

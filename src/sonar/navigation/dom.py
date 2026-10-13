@@ -182,6 +182,8 @@ class DomNavigator:
         self.cutoff = cutoff
         self._queue: list[Candidate] | None = None  # None until the list pages are read
         self.skipped_seen = 0
+        self.failed_opens = 0  # postings that would not open; the run is then not "clean"
+        self.reached_cutoff = False  # False if collection ended at the page cap instead
 
     async def login(self) -> None:
         if self.site.requires_login:
@@ -214,10 +216,12 @@ class DomNavigator:
                 self.site.name, step + 1, len(candidates), last_date, found.has_more,
             )
             if stopped or not found.has_more or not found.links:
+                self.reached_cutoff = True  # passed the cutoff date, or the site has no more rows
                 break
             if not any(c.listed_date for c in candidates) and all(
                 c.job_id and self.is_seen(c.job_id) for c in candidates
             ):
+                self.reached_cutoff = True
                 break  # no dates on this site's list: stop at a page of only known postings
         else:
             log.warning("site=%s step=collect outcome=page_cap_reached cutoff=%s", self.site.name, self.cutoff)
@@ -242,6 +246,7 @@ class DomNavigator:
                     raise RuntimeError(f"HTTP {response.status if response else 'none'}")
             except Exception as exc:  # one bad posting must not stop the site
                 log.warning("site=%s job_id=%s step=open outcome=failed error=%s", self.site.name, cand.job_id, exc)
+                self.failed_opens += 1
                 await page.close()
                 continue
             return OpenedListing(job_id=cand.job_id, url=cand.url, page=page, listed_date=cand.listed_date)

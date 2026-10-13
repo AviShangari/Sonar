@@ -155,6 +155,40 @@ def test_page_cap_limits_load_more_steps() -> None:
     asyncio.run(scenario())
 
 
+def test_reached_cutoff_is_false_only_when_the_page_cap_ends_collection() -> None:
+    async def scenario() -> None:
+        capped, _ = make_navigator([answer([row(f"p{i}")], has_more=True) for i in range(10)])
+        await drain(capped)
+        assert capped.reached_cutoff is False
+
+        old_row, _ = make_navigator([answer([row("a1"), row("c1", "2026/10/07")], has_more=True)])
+        await drain(old_row)
+        assert old_row.reached_cutoff is True
+
+        no_more, _ = make_navigator([answer([row("a1")], has_more=False)])
+        await drain(no_more)
+        assert no_more.reached_cutoff is True
+
+    asyncio.run(scenario())
+
+
+def test_a_posting_that_will_not_open_is_counted() -> None:
+    async def scenario() -> None:
+        class BrokenPage(FakePage):
+            async def goto(self, url: str, wait_until: str) -> object:
+                return type("Response", (), {"status": 500})()
+
+        class BrokenContext(FakeContext):
+            async def new_page(self) -> FakePage:
+                return BrokenPage()
+
+        nav, _ = make_navigator([answer([row("a1")])], context=BrokenContext())
+        assert await drain(nav) == []
+        assert nav.failed_opens == 1
+
+    asyncio.run(scenario())
+
+
 def test_list_not_sorted_newest_first_is_an_error() -> None:
     async def scenario() -> None:
         nav, _ = make_navigator([answer([row("a1", "2026/10/08"), row("b1", "2026/10/09")])])

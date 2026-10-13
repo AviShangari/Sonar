@@ -72,7 +72,9 @@ def test_send_needs_password_and_addresses(monkeypatch, tmp_path) -> None:
 
 
 def test_subject_flags_a_bad_run() -> None:
-    assert send.build_message(make_report(status="failed"), settings())["Subject"].endswith("[failed]")
+    assert send.build_message(make_report(status="failed"), settings())["Subject"].startswith("[RUN FAILED]")
+    assert send.build_message(make_report(status="partial"), settings())["Subject"].startswith("[SOME SITES FAILED]")
+    assert send.build_message(make_report(), settings())["Subject"] == "Sonar: 0 matches (run 3)"
 
 
 def test_password_is_read_from_env_file(monkeypatch, tmp_path) -> None:

@@ -171,3 +171,13 @@ def test_a_crash_while_collecting_leaves_a_screenshot_and_still_raises(tmp_path,
 def test_a_clean_run_takes_no_screenshots(tmp_path, wire) -> None:
     collect(tmp_path)
     assert not list(tmp_path.glob("*"))
+
+
+def test_file_names_use_the_given_time_zone(tmp_path) -> None:
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    toronto = ZoneInfo("America/Toronto")
+    path = run(FailureShots(tmp_path, "demo", tz=toronto).take(FakePage(), "open"))
+    stamp = datetime.strptime(path.name[:15], "%Y%m%d-%H%M%S")
+    assert abs((stamp - datetime.now(toronto).replace(tzinfo=None)).total_seconds()) < 60

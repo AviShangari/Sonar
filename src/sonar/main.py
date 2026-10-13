@@ -84,7 +84,7 @@ def deliver(engine: Engine, run_id: int, settings: Settings) -> None:
     """Write the report files and send the email. Never raises: it also runs while a crash is being
     reported, and a delivery problem must not hide the original error."""
     try:
-        report = build_report(engine, run_id, settings.matcher)
+        report = build_report(engine, run_id, settings.matcher, settings.tz)
         for path in write_report(report, settings.report_path):
             print(f"report written: {path}")
         if settings.email:

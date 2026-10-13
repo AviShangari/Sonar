@@ -164,6 +164,49 @@ def test_date_is_unsure_when_not_certain_quote_is_missing_from_text_or_date_is_b
     assert bad.closing_date == "" and bad.closing_unsure
 
 
+TENDER = (
+    TEXT + "\nSolicitation number: WS123-45\nOrganization: Health Canada"
+    "\nIssued under the Task-Based Informatics Professional Services (TBIPS) arrangement."
+)
+
+
+def test_the_new_fields_are_kept_and_trusted_when_found_in_the_posting() -> None:
+    info = parse_posting_info(answer(
+        solicitation_number="WS123-45", department="Health Canada", supply_arrangement="TBIPS",
+        supply_arrangement_quote="Task-Based Informatics Professional Services (TBIPS)"), TENDER)
+    assert (info.solicitation_number, info.department, info.supply_arrangement, info.unverified) == ("WS123-45", "Health Canada", "TBIPS", [])
+
+
+def test_a_value_not_found_in_the_posting_is_kept_but_flagged() -> None:
+    info = parse_posting_info(answer(
+        solicitation_number="XX-999", department="Dept of Invented Things", supply_arrangement="THS",
+        supply_arrangement_quote="Temporary Help Services"), TENDER)
+    assert info.solicitation_number == "XX-999"
+    assert sorted(info.unverified) == ["department", "solicitation_number", "supply_arrangement"]
+
+
+def test_no_arrangement_answers_become_empty_and_are_not_flagged() -> None:
+    for none in ("", "None", "N/A", "not applicable"):
+        info = parse_posting_info(answer(supply_arrangement=none, supply_arrangement_quote=""), TENDER)
+        assert info.supply_arrangement == "" and "supply_arrangement" not in info.unverified
+
+
+def test_new_fields_reach_the_report_with_flags_and_placeholders(setup) -> None:
+    engine, run_id = setup
+
+    async def summarizer(title: str, text: str) -> PostingInfo:
+        if title == "Tender 0":
+            return PostingInfo(summary="S", solicitation_number="WS1", supply_arrangement="TBIPS", department="Health Canada")
+        return PostingInfo(summary="S", solicitation_number="XX", department="", unverified=["solicitation_number"])
+
+    asyncio.run(summarize_matches(engine, run_id, "keywords", summarizer))
+    shown = {m.title: (m.solicitation_number, m.supply_arrangement, m.department) for m in build_report(engine, run_id, "keywords").matches}
+    assert shown == {
+        "Tender 0": ("WS1", "TBIPS", "Health Canada"),
+        "Tender 1": ("XX (unsure, please verify)", "N/A", "not found, please verify"),
+    }
+
+
 def test_unusable_answers_raise() -> None:
     with pytest.raises(ValueError):
         parse_posting_info("I could not read it", TEXT)

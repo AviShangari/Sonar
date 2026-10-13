@@ -50,9 +50,9 @@ async def collect_site(
     outcome = SiteOutcome(site.name)
     # The stop point is the watermark, which only a clean run moves. A capped or failed run leaves it
     # where it was, so the next run re-reads down to it (known postings are skipped by dedup).
-    cutoff = get_watermark(engine, site.name) or date.today() - timedelta(days=days if days is not None else site.first_run_days)
+    cutoff = get_watermark(engine, site.name) or settings.today() - timedelta(days=days if days is not None else site.first_run_days)
     async with open_browser(site, port=settings.cdp_port, headless=settings.headless) as context:
-        shots = FailureShots(settings.screenshot_path, site.name)
+        shots = FailureShots(settings.screenshot_path, site.name, tz=settings.tz)
         navigator = build_navigator(
             settings.navigator, site, context, settings.cdp_port,
             is_seen=lambda job_id: listing_exists(engine, site.name, job_id), cutoff=cutoff, shots=shots,

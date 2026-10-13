@@ -82,3 +82,31 @@ def test_files_are_written(tmp_path) -> None:
     text = (tmp_path / f"report-run-{run_id}.txt").read_text(encoding="utf-8")
     assert "1. Two keywords" in text and "SAP (x2)" in text and "https://x.example/C1" in text
     assert max(len(line) for line in text.splitlines()) <= 90
+
+
+def test_run_time_is_shown_in_the_given_time_zone_and_utc_by_default() -> None:
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from sqlalchemy.orm import Session
+
+    from sonar.db.tables import RunRow
+
+    engine = make_engine("sqlite://")
+    run_id = queries.start_run(engine)
+    toronto = ZoneInfo("America/Toronto")
+    for stored_utc, shown in ((datetime(2026, 10, 13, 13, 0), "October 13, 2026, 09:00 EDT"),  # daylight time
+                              (datetime(2026, 12, 13, 13, 0), "December 13, 2026, 08:00 EST")):  # standard time
+        with Session(engine) as session:
+            session.get(RunRow, run_id).started_at = stored_utc  # the database stores naive UTC
+            session.commit()
+        assert build_report(engine, run_id, "keywords", toronto).started_at == shown
+    assert build_report(engine, run_id, "keywords").started_at == "December 13, 2026, 13:00 UTC"
+
+
+def test_a_single_digit_day_has_no_leading_zero() -> None:
+    from datetime import datetime
+
+    from sonar.report.build import _long_date_time
+
+    assert _long_date_time(datetime(2026, 10, 5, 9, 5)) == "October 5, 2026, 09:05 "  # %Z is empty for a naive time

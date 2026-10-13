@@ -1,5 +1,8 @@
 """Builds the report for one run from the database. Plain code: no agent writes the report."""
 
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
 from sqlalchemy import func, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
@@ -24,9 +27,26 @@ def closing_text(fields: dict) -> str | None:
     return f"{date} (unsure, please verify)" if fields.get("closing_unsure") else date
 
 
-def build_report(engine: Engine, run_id: int, matcher: str) -> Report:
+def _long_date_time(moment: datetime) -> str:
+    """October 15, 2026, 09:00 EDT. Built by hand because %-d (no leading zero) does not work on Windows."""
+    return f"{moment:%B} {moment.day}, {moment.year}, {moment:%H:%M %Z}"
+
+
+def checked_text(fields: dict, key: str, missing: str) -> str | None:
+    """A summary-agent field as shown: the value, flagged if it was not found in the posting, or `missing`
+    when the posting does not give it. None when the posting was not read yet."""
+    if "unverified" not in fields:
+        return None
+    value = fields.get(key)
+    if not value:
+        return missing
+    return f"{value} (unsure, please verify)" if key in fields["unverified"] else value
+
+
+def build_report(engine: Engine, run_id: int, matcher: str, tz: ZoneInfo | None = None) -> Report:
     """The report for a run: counts, failed sites (if any) and the matches that run found.
-    Always produced, even with zero matches."""
+    Always produced, even with zero matches. The run's start time is shown in `tz` (UTC if not given);
+    the database itself always stores UTC."""
     with Session(engine) as session:
         run = session.get(RunRow, run_id)
         if run is None:
@@ -48,6 +68,9 @@ def build_report(engine: Engine, run_id: int, matcher: str) -> Report:
             summary=(listing.fields or {}).get("summary"),
             how_to_apply=(listing.fields or {}).get("how_to_apply") or None,
             closing_date=closing_text(listing.fields or {}),
+            solicitation_number=checked_text(listing.fields or {}, "solicitation_number", "not found, please verify"),
+            supply_arrangement=checked_text(listing.fields or {}, "supply_arrangement", "N/A"),
+            department=checked_text(listing.fields or {}, "department", "not found, please verify"),
             hits=[KeywordHit(**hit) for hit in decision.details.get("hits", [])],
         )
         for listing, decision in matched_listings(engine, run_id)
@@ -58,7 +81,7 @@ def build_report(engine: Engine, run_id: int, matcher: str) -> Report:
     return Report(
         run_id=run_id,
         status=status,
-        started_at=started_at.strftime("%Y-%m-%d %H:%M UTC"),
+        started_at=_long_date_time(started_at.replace(tzinfo=timezone.utc).astimezone(tz or timezone.utc)),
         failed_sites=notes if status in ("partial", "failed") else None,
         new_postings=new_postings or 0,
         scored=scored or 0,

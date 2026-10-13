@@ -73,6 +73,9 @@ class ReportMatch(BaseModel):
     summary: str | None = None  # short agent-written summary; None if it could not be written
     how_to_apply: str | None = None  # as the posting says; None if not stated or no summary
     closing_date: str | None = None  # what to show: "2026-12-31", "2026-12-31 (unsure, please verify)" or None
+    solicitation_number: str | None = None  # None if the posting was not read; may end "(unsure, please verify)"
+    supply_arrangement: str | None = None  # "N/A" when none applies
+    department: str | None = None
     hits: list[KeywordHit]
 
 

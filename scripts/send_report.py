@@ -1,6 +1,6 @@
 """Email the report of a past run (to test the email settings), without running the pipeline.
 Needs SONAR_SMTP_PASSWORD in .env. Works even when `email: false` in settings.
---dry-run prints the email instead of sending it (no password or network needed).
+--dry-run prints the plain-text part of the email instead of sending it (no password or network needed).
 Run:  .venv\Scripts\python.exe scripts/send_report.py RUN_ID [--dry-run]
 """
 
@@ -17,10 +17,10 @@ parser.add_argument("--dry-run", action="store_true", help="print the email, do 
 args = parser.parse_args()
 
 settings = load_settings()
-report = build_report(make_engine(settings.database_url), args.run_id, settings.matcher)
+report = build_report(make_engine(settings.database_url), args.run_id, settings.matcher, settings.tz)
 if args.dry_run:
     message = build_message(report, settings)
-    print(f"To: {message['To']}\nSubject: {message['Subject']}\n\n{message.get_content()}")
+    print(f"To: {message['To']}\nSubject: {message['Subject']}\n\n{message.get_body(('plain',)).get_content()}")
 else:
     send_report(report, settings)
     print(f"sent to {settings.email_to}")

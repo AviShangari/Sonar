@@ -10,7 +10,9 @@ import logging
 import os
 import sys
 
-from sonar.config import load_settings
+from sqlalchemy.engine import Engine
+
+from sonar.config import Settings, load_settings
 from sonar.db.queries import fail_stale_runs, finish_run, start_run
 from sonar.db.tables import make_engine
 from sonar.matching.factory import build_matcher
@@ -48,6 +50,7 @@ async def run(site_name: str | None, days: int | None, max_new: int | None) -> i
             outcomes.append(await run_site(site, settings, engine, matcher, run_id, days, max_new))
     except BaseException as exc:  # includes Ctrl+C, so a stopped run is never left as "running"
         finish_run(engine, run_id, "failed", repr(exc))
+        deliver(engine, run_id, settings)  # a crashed run must not look like a quiet day
         raise
     if settings.summaries:
         try:  # summaries are a bonus: a failure here must not fail the run
@@ -58,16 +61,22 @@ async def run(site_name: str | None, days: int | None, max_new: int | None) -> i
     status = run_status(outcomes)
     finish_run(engine, run_id, status, notes)
     print_summary(run_id, status, outcomes)
-    report = build_report(engine, run_id, settings.matcher)
-    for path in write_report(report, settings.report_path):
-        print(f"report written: {path}")
-    if settings.email:
-        try:  # a failed email must not fail the run; the report files are already written
+    deliver(engine, run_id, settings)
+    return 0 if status == "ok" else 1
+
+
+def deliver(engine: Engine, run_id: int, settings: Settings) -> None:
+    """Write the report files and send the email. Never raises: it also runs while a crash is being
+    reported, and a delivery problem must not hide the original error."""
+    try:
+        report = build_report(engine, run_id, settings.matcher)
+        for path in write_report(report, settings.report_path):
+            print(f"report written: {path}")
+        if settings.email:
             send_report(report, settings)
             print(f"email sent to {settings.email_to}")
-        except Exception as exc:
-            print(f"email failed: {exc}")
-    return 0 if status == "ok" else 1
+    except Exception as exc:
+        print(f"report or email failed: {exc}")
 
 
 def print_summary(run_id: int, status: str, outcomes: list[SiteOutcome]) -> None:

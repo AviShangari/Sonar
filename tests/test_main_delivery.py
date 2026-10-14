@@ -93,3 +93,20 @@ def test_a_run_is_skipped_with_an_alert_while_another_run_holds_the_lock(wired, 
 
     with Session(engine) as session:
         assert session.query(RunRow).count() == 0  # a skipped run does not even create a run record
+
+
+def test_several_sites_can_be_picked_in_one_run_and_unknown_names_stop_it(wired, monkeypatch) -> None:
+    other = SiteConfig(name="demo2", start_url="https://b.example.com/", allowed_hosts=["b.example.com"])
+    third = SiteConfig(name="demo3", start_url="https://c.example.com/", allowed_hosts=["c.example.com"])
+    monkeypatch.setattr(main, "load_sites", lambda: [SITE, other, third])
+    ran: list[str] = []
+
+    async def quiet(site, settings, engine, matcher, run_id, days, max_new):
+        ran.append(site.name)
+        return main.SiteOutcome(site.name, decisions=[])
+
+    monkeypatch.setattr(main, "run_site", quiet)
+    assert asyncio.run(main.run(["demo", "demo3"], None, None)) == 0
+    assert ran == ["demo", "demo3"]  # both in the one run, in the order of sites.yaml; demo2 left out
+    with pytest.raises(SystemExit, match="nope"):
+        asyncio.run(main.run(["demo", "nope"], None, None))

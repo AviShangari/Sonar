@@ -15,6 +15,9 @@ from sonar.navigation.session import open_browser
 from sonar.sites import load_sites
 
 
+HOLD_ON_ERROR_SECONDS = 8
+
+
 async def main(name: str) -> int:
     site = {s.name: s for s in load_sites()}[name]
     guard, blocked = GuardState(), []
@@ -23,6 +26,7 @@ async def main(name: str) -> int:
             await log_in(context, site, guard)
         except LoginFailed as exc:
             print("LOGIN FAILED:", exc)
+            await asyncio.sleep(HOLD_ON_ERROR_SECONDS)  # keep the window open so the page can be read
             return 1
         page = context.pages[-1]
         print("logged in. address:", page.url)

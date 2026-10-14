@@ -23,7 +23,7 @@ from sonar.report.render import write_report
 from sonar.report.send import send_alert, send_report
 from sonar.runlock import RunLocked, run_lock
 from sonar.summarize.summaries import summarize_matches
-from sonar.sites import SiteConfig, load_sites
+from sonar.sites import SiteConfig, load_sites, note_sites, site_accounts
 
 
 def run_status(outcomes: list[SiteOutcome]) -> str:
@@ -33,7 +33,7 @@ def run_status(outcomes: list[SiteOutcome]) -> str:
     return "failed" if len(failed) == len(outcomes) else "partial"
 
 
-async def run(site_name: str | None, days: int | None, max_new: int | None) -> int:
+async def run(site_names: list[str] | None, days: int | None, max_new: int | None) -> int:
     settings = load_settings()
     if settings.auth == "subscription":
         for var in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"):
@@ -43,9 +43,9 @@ async def run(site_name: str | None, days: int | None, max_new: int | None) -> i
         llm.configure(settings)  # fails before anything starts if the API key is missing
     except RuntimeError as exc:
         sys.exit(str(exc))
-    sites = [s for s in load_sites() if site_name in (None, s.name)]
-    if not sites:
-        sys.exit(f"no site named '{site_name}' in config/sites.yaml")
+    sites = [s for s in load_sites() if not site_names or s.name in site_names]
+    if unknown := set(site_names or []) - {s.name for s in sites}:
+        sys.exit(f"no site named {', '.join(sorted(unknown))} in config/sites.yaml")
     try:
         with run_lock("run", settings.lock_path):  # one run at a time
             return await run_locked(settings, sites, days, max_new)
@@ -108,7 +108,7 @@ def deliver(engine: Engine, run_id: int, settings: Settings) -> None:
     """Write the report files and send the email. Never raises: it also runs while a crash is being
     reported, and a delivery problem must not hide the original error."""
     try:
-        report = build_report(engine, run_id, settings.matcher, settings.tz)
+        report = build_report(engine, run_id, settings.matcher, settings.tz, note_sites(), site_accounts())
         for path in write_report(report, settings.report_path):
             print(f"report written: {path}")
         if settings.email:
@@ -135,7 +135,7 @@ def print_summary(run_id: int, status: str, outcomes: list[SiteOutcome]) -> None
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
     parser = argparse.ArgumentParser(description="Run the Sonar pipeline.")
-    parser.add_argument("--site", help="only this site (default: all)")
+    parser.add_argument("--site", action="append", help="only this site; repeat it for several (default: all)")
     parser.add_argument("--days", type=int, help="first-run window in days, used only when nothing is stored yet")
     parser.add_argument("--max-new", type=int, help="TEST CAP on new postings per site. Safe to use: a capped run does not move the stop point")
     args = parser.parse_args()

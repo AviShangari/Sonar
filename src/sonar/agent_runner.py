@@ -96,7 +96,9 @@ async def run_browser_agent(
             check_code(code)
         except CodeRejected as exc:
             return {"content": [{"type": "text", "text": f"REJECTED: {exc}"}], "is_error": True}
-        return {"content": [{"type": "text", "text": await run_cli(port, code)}]}
+        output = await run_cli(port, code)
+        log.info("agent code output (first 600 characters):\n%s", output[:600])
+        return {"content": [{"type": "text", "text": output}]}
 
     options = isolated_options(
         system_prompt, max_turns, "navigation",

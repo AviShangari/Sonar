@@ -73,6 +73,8 @@ async def log_in(context: BrowserContext, site: SiteConfig, guard: GuardState, s
     try:
         await page.goto(site.login_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT_MS)
         await page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT_MS)
+        if page.url.startswith("chrome-error:"):  # the browser's own error page has no password box either
+            raise LoginFailed(f"the login page did not load (blocked or unreachable): {site.login_url}")
         if not await has_password_box(page):
             log.info("site=%s step=login outcome=already_logged_in", site.name)
             return

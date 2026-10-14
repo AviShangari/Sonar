@@ -16,6 +16,7 @@ class OpenedListing:
     page: Page
     listed_date: date | None = None  # date shown in the site's result list, if any
     in_list_tab: bool = False  # opened by clicking in the list tab (page IS the list tab): closing goes back instead
+    title: str | None = None  # the row's title in the site's list; better than the tab title when that is generic ("Ariba Spend Management")
 
 
 class Navigator(Protocol):

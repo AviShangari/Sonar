@@ -183,6 +183,60 @@ def test_when_no_open_tab_shows_the_list_the_site_stops_at_the_first_failure(bas
     asyncio.run(scenario())
 
 
+def test_a_list_inside_an_embedded_frame_is_clicked_too(base) -> None:
+    """Ariba's Events table is in an iframe, and its links reload the whole tab (target=_parent). The click
+    search must look inside frames; a posting address typed into a new tab is refused (403) here."""
+    from datetime import date
+
+    class Framed(Site):
+        def do_GET(self) -> None:
+            if self.path == "/list":
+                self._send(200, '<html><body><h1>Dashboard</h1><iframe src="/frame"></iframe></body></html>')
+            elif self.path == "/frame":
+                links = "".join(f'<p><a target="_parent" href="/hop?itemID=ID{i}">{t}</a></p>' for i, t in enumerate(TITLES))
+                self._send(200, f"<html><body>{links}</body></html>")
+            elif self.path.startswith("/hop?"):
+                if "/frame" not in (self.headers.get("Referer") or ""):
+                    self._send(403, "<html><body>Error!</body></html>")
+                else:
+                    i = int(self.path.split("ID")[-1])
+                    self._send(200, f"<html><body><h1>{TITLES[i]}</h1><p>posting number {i}</p></body></html>")
+            else:
+                self._send(404, "")
+
+    httpd = HTTPServer(("127.0.0.1", 0), Framed)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    host = f"http://127.0.0.1:{httpd.server_port}"
+    rows = [{"title": TITLES[i], "url": f"{host}/hop?itemID=ID{i}", "date": "2026-10-09"} for i in range(len(TITLES))]
+    site = SiteConfig(name="demo", start_url=host + "/list", allowed_hosts=["127.0.0.1"])
+
+    async def collect(site, offset):
+        return json.dumps({"links": rows, "has_more": False})
+
+    async def scenario():
+        async with async_playwright() as pw:
+            browser = await pw.chromium.launch(headless=True)
+            context = await browser.new_context()
+            list_page = await context.new_page()
+            await list_page.goto(host + "/list")
+            await list_page.wait_for_load_state("networkidle")
+            nav = DomNavigator(site, context, collect, is_seen=lambda j: False, cutoff=date(2026, 10, 1))
+            seen = []
+            while (opened := await nav.next_listing()):
+                seen.append((opened.job_id, " ".join((await opened.page.inner_text("body")).split()), opened.in_list_tab))
+                await nav.close_listing(opened)
+                await list_page.wait_for_load_state("networkidle")
+            await browser.close()
+            return seen, nav.failed_opens
+
+    seen, failed = asyncio.run(scenario())
+    httpd.shutdown()
+    assert failed == 0
+    assert [s[0] for s in seen] == ["ID0", "ID1", "ID2"]  # the ID comes from the kept itemID parameter
+    assert all(s[2] for s in seen)  # each was opened by clicking inside the frame
+    assert ["posting number 0" in seen[0][1], "posting number 1" in seen[1][1], "posting number 2" in seen[2][1]] == [True] * 3
+
+
 def test_the_agent_prompt_teaches_clicking_when_typed_addresses_fail() -> None:
     from sonar.navigation.dom import SYSTEM_PROMPT
 

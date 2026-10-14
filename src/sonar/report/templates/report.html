@@ -50,7 +50,7 @@
 {% for m in report.matches %}
   <div class="card">
     <h3><a href="{{ m.url|safe_url }}">{{ m.title }}</a></h3>
-    <p class="meta">{{ m.site }}{% if m.posted_date %} &middot; posted {{ m.posted_date }}{% elif m.listed_date %} &middot; listed {{ m.listed_date }}{% endif %}</p>
+    <p class="meta">{{ m.site }}{% if m.account %} &middot; {{ m.account }}{% endif %}{% if m.posted_date %} &middot; posted {{ m.posted_date }}{% elif m.listed_date %} &middot; listed {{ m.listed_date }}{% endif %}</p>
     <div class="chips">
 {% for hit in m.hits %}
       <span class="chip">{{ hit.keyword }}{% if hit.count > 1 %} &times;{{ hit.count }}{% endif %}</span>

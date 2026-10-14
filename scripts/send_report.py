@@ -10,6 +10,7 @@ from sonar.config import load_settings
 from sonar.db.tables import make_engine
 from sonar.report.build import build_report
 from sonar.report.send import build_message, send_report
+from sonar.sites import note_sites, site_accounts
 
 parser = argparse.ArgumentParser()
 parser.add_argument("run_id", type=int)
@@ -17,7 +18,7 @@ parser.add_argument("--dry-run", action="store_true", help="print the email, do 
 args = parser.parse_args()
 
 settings = load_settings()
-report = build_report(make_engine(settings.database_url), args.run_id, settings.matcher, settings.tz)
+report = build_report(make_engine(settings.database_url), args.run_id, settings.matcher, settings.tz, note_sites(), site_accounts())
 if args.dry_run:
     message = build_message(report, settings)
     print(f"To: {message['To']}\nSubject: {message['Subject']}\n\n{message.get_body(('plain',)).get_content()}")

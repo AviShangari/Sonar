@@ -8,8 +8,12 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from sonar.db.queries import matched_listings
+from sonar.extraction.documents import has_document_links
 from sonar.db.tables import DecisionRow, ListingRow, RunRow
 from sonar.models import KeywordHit, Report, ReportMatch
+
+
+REVIEW_NOTE = "Please review the attached documents in the listing to verify that this listing is relevant."
 
 
 def _rank_key(match: ReportMatch) -> tuple[int, int]:
@@ -43,10 +47,20 @@ def checked_text(fields: dict, key: str, missing: str) -> str | None:
     return f"{value} (unsure, please verify)" if key in fields["unverified"] else value
 
 
-def build_report(engine: Engine, run_id: int, matcher: str, tz: ZoneInfo | None = None) -> Report:
+def build_report(
+    engine: Engine,
+    run_id: int,
+    matcher: str,
+    tz: ZoneInfo | None = None,
+    note_sites: frozenset[str] = frozenset(),
+    accounts: dict[str, str] | None = None,
+) -> Report:
     """The report for a run: counts, failed sites (if any) and the matches that run found.
     Always produced, even with zero matches. The run's start time is shown in `tz` (UTC if not given);
-    the database itself always stores UTC."""
+    the database itself always stores UTC. Matches get the 'review the documents' note when their site is in
+    `note_sites` (sites.yaml `attachment_note`) or their saved page links to document files. `accounts`
+    (site name to sites.yaml `account` label) tells each match which login found it."""
+    accounts = accounts or {}
     with Session(engine) as session:
         run = session.get(RunRow, run_id)
         if run is None:
@@ -71,6 +85,8 @@ def build_report(engine: Engine, run_id: int, matcher: str, tz: ZoneInfo | None 
             solicitation_number=checked_text(listing.fields or {}, "solicitation_number", "not found, please verify"),
             supply_arrangement=checked_text(listing.fields or {}, "supply_arrangement", "N/A"),
             department=checked_text(listing.fields or {}, "department", "not found, please verify"),
+            review_note=REVIEW_NOTE if listing.site in note_sites or has_document_links(listing.raw_html) else None,
+            account=accounts.get(listing.site),
             hits=[KeywordHit(**hit) for hit in decision.details.get("hits", [])],
         )
         for listing, decision in matched_listings(engine, run_id)

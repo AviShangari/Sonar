@@ -11,7 +11,7 @@ listings:
   - id: phrase
     why: A multi-word keyword is found as a phrase.
     title: HR system rollout support
-    text: Provide change management services for the new HR system rollout.
+    text: Provide software consulting and change management services for the new HR system rollout.
     expected: [change management]
 
   - id: case-insensitive
@@ -40,7 +40,7 @@ listings:
       Transformation program, with Project Management, RPA bots and business
       intelligence dashboards.
     expected:
-      - Microsoft
+      - Dynamics 365
       - Microsoft Dynamics
       - SAP
       - Business Transformation
@@ -81,7 +81,7 @@ listings:
   - id: messy-whitespace
     why: Web text has line breaks and double spaces; phrases must still match.
     title: Messy copy
-    text: "Lead change\nmanagement and Business  intelligence reporting."
+    text: "Lead change\nmanagement and Business  intelligence reporting for a cloud platform."
     expected: [change management, Business intelligence]
 
   - id: repeated-keyword
@@ -89,3 +89,55 @@ listings:
     title: SAP everywhere
     text: SAP is used here. We run SAP for finance and sap for HR.
     expected: [SAP]
+
+  - id: teams-meeting-link
+    why: A Microsoft Teams link for a site visit is not Microsoft IT work ("Microsoft" alone is not a keyword).
+    title: Storage shed construction
+    text: >-
+      The site visit is virtual. Location: Microsoft Teams, https://teams.microsoft.com/meet/12345.
+      Contractors must supply and install a new storage shed.
+    expected: []
+
+  - id: office-software-mention
+    why: Word and Excel are not the Microsoft 365 / Dynamics stack the client means.
+    title: Administrative training
+    text: Staff need training in Microsoft Word and Microsoft Excel for report writing.
+    expected: []
+
+  - id: microsoft-stack-products
+    why: The Microsoft stack is found by its products.
+    title: Reporting platform
+    text: Build Power BI dashboards on Azure with data from SharePoint, using Dataverse and Power Apps.
+    expected: [Power BI, Azure, SharePoint, Dataverse, Power Apps]
+
+  - id: ariba-portal-only
+    why: SAP Ariba and SAP Business Network are portals tenders name for bidding, not SAP work.
+    title: Office furniture supply
+    text: >-
+      Documents can be downloaded when logged into your SAP Ariba account. Questions go through the
+      Event Messages tab in the SAP Business Network event. SAP Fieldglass is not used.
+    expected: []
+
+  - id: sap-project-with-ariba-instructions
+    why: A real SAP project still matches when the tender also names the Ariba portal.
+    title: SAP S/4HANA migration
+    text: Implement SAP S/4HANA for finance. Submit your bid through SAP Ariba before closing.
+    expected: [SAP]
+
+  - id: generic-keyword-in-non-client-work
+    why: A generic keyword (Project Management) in work outside recruitment, consulting and tech does not count.
+    title: Survey of student habits
+    text: The contractor will provide project management and field staff to run a student survey in schools.
+    expected: []
+
+  - id: generic-keyword-with-consulting-context
+    why: The same generic keyword counts when the posting is consulting work.
+    title: PMO support
+    text: The department seeks consulting services to support its Project Management Office.
+    expected: [Project Management]
+
+  - id: generic-keyword-with-specific-keyword
+    why: A generic keyword counts when a specific keyword (SAP) shows the work is IT, even with no context term.
+    title: ERP program
+    text: A Business Transformation program to move payroll onto SAP.
+    expected: [Business Transformation, SAP]

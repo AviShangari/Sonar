@@ -1,18 +1,72 @@
 # Client keyword list. Every keyword is checked against every listing.
 # Matching is case-insensitive and whole-word; multi-word entries match as exact phrases.
+#
+# An entry is a plain keyword, or {keyword: ..., ignore_inside: [...], needs_context: true}.
+#   ignore_inside:  a hit that lies inside one of these phrases does not count (for example "SAP" inside
+#                   "SAP Ariba": the portal a tender tells bidders to use, not an SAP project).
+#   needs_context:  for generic keywords that also appear in construction, property or survey work. The hit counts only if
+#                   the posting contains one of the context_terms below, or also has a specific keyword hit
+#                   (a keyword WITHOUT needs_context, such as SAP or Azure).
+#
+# "Microsoft" on its own is NOT a keyword: it matched Microsoft Teams meeting links in construction tenders.
+# It means the Microsoft 365 / Dynamics stack, so the products are listed instead (2026-10-14, team lead).
 keywords:
   - MS Dynamics
-  - SAP
+  - keyword: SAP
+    ignore_inside: ["SAP Ariba", "SAP Business Network", "SAP Fieldglass"]
   - ServiceNow
   - Peoplesoft
   - Oracle
   - Workday
-  - Microsoft
-  - change management
-  - Business intelligence
+  - Microsoft Dynamics
+  - Dynamics 365
+  - Microsoft 365
+  - Power Platform
+  - Power BI
+  - Power Apps
+  - Power Automate
+  - Azure
+  - SharePoint
+  - Dataverse
+  - keyword: change management
+    needs_context: true
+  - keyword: Business intelligence
+    needs_context: true
   - IT Professional Services
   - Robotic Process Automation
   - RPA
-  - Project Management
-  - Business Transformation
-  - Microsoft Dynamics
+  - keyword: Project Management
+    needs_context: true
+  - keyword: Business Transformation
+    needs_context: true
+
+# The client's areas of work: recruitment, consulting and tech (2026-10-14). Whole-word, case-insensitive.
+# Starter list, to be reviewed by the client. Not the bare word "IT": case-insensitively it is the pronoun "it".
+context_terms:
+  # recruitment
+  - recruitment
+  - recruiting
+  - recruiter
+  - recruiters
+  - staffing
+  - talent acquisition
+  - executive search
+  - temporary help
+  - resource augmentation
+  # consulting
+  - consulting
+  - consultant
+  - consultants
+  - advisory services
+  - professional services
+  # tech
+  - information technology
+  - IT services
+  - IT consulting
+  - software
+  - cloud
+  - cybersecurity
+  - digital transformation
+  - application development
+  - data analytics
+  - managed services

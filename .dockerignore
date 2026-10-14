@@ -1,0 +1,16 @@
+# Never in the image: secrets, local data, the laptop's virtual environment, git history.
+.env
+.env.*
+data/
+.venv/
+.git/
+.pytest_cache/
+**/__pycache__/
+*.db
+# config/ is mounted at run time (so adding a site needs no rebuild), not baked in.
+config/
+tests/
+evals/
+scripts/
+*.md
+!README.md

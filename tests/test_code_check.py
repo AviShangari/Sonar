@@ -12,6 +12,11 @@ ALLOWED = {
         '    print(n.get("name", {}).get("value", "").strip())'
     ),
     "click a point": 'q = cdp("DOM.getBoxModel", backendNodeId=7)["model"]["content"]\nclick_at_xy(sum(q[0::2]) / 4, sum(q[1::2]) / 4)',
+    "scroll then click": (
+        'cdp("DOM.scrollIntoViewIfNeeded", backendNodeId=7)\n'
+        'q = cdp("DOM.getBoxModel", backendNodeId=7)["model"]["content"]\n'
+        'click_at_xy(sum(q[0::2]) / 4, sum(q[1::2]) / 4)'
+    ),
     "f-string": 'x = 3\nprint(f"clicks: {x}")',
     "tabs": 'tabs = list_tabs()\nswitch_tab(tabs[0]["targetId"])',
 }

@@ -16,6 +16,7 @@ from claude_agent_sdk import (
     AssistantMessage,
     ClaudeAgentOptions,
     ResultMessage,
+    TextBlock,
     ToolUseBlock,
     create_sdk_mcp_server,
     query,
@@ -40,17 +41,19 @@ class AgentError(RuntimeError):
 
 
 def cli_path() -> str:
-    found = shutil.which("browser-use") or str(Path.home() / ".local" / "bin" / "browser-use.exe")
+    exe = "browser-use.exe" if os.name == "nt" else "browser-use"
+    found = shutil.which("browser-use") or str(Path.home() / ".local" / "bin" / exe)
     if not Path(found).exists():
         raise AgentError("browser-use CLI not found. Install: uv tool install browser-use==0.13.11 --python 3.12")
     return found
 
 
 def cli_env(port: int) -> dict[str, str]:
-    """A clean environment for the CLI: only what Windows needs, plus our settings.
+    """A clean environment for the CLI: only what Windows or Linux needs, plus our settings.
     Telemetry and update checks off; config and workspace kept under data/."""
     keep = ["SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "TEMP", "TMP", "USERPROFILE", "HOMEDRIVE", "HOMEPATH",
-            "LOCALAPPDATA", "APPDATA", "PATH", "PATHEXT", "COMSPEC"]
+            "LOCALAPPDATA", "APPDATA", "PATH", "PATHEXT", "COMSPEC",
+            "HOME", "LANG", "LC_ALL", "TMPDIR"]  # the last four are Linux
     env = {k: os.environ[k] for k in keep if k in os.environ}
     env.update(
         BU_CDP_URL=f"http://127.0.0.1:{port}",  # attach to OUR browser, never the user's own Chrome
@@ -130,10 +133,12 @@ def isolated_options(system_prompt: str, max_turns: int, role: Role, **extra) ->
 async def run_query(task: str, options: ClaudeAgentOptions, timeout_s: int) -> str:
     await budget.current.charge_agent_call()  # raises BudgetExceeded once a run-wide limit is hit
     result: ResultMessage | None = None
+    last_blocks: list[str] = []  # what the agent's last message held, for the error message if it ends badly
     try:
         async with asyncio.timeout(timeout_s):
             async for message in query(prompt=task, options=options):
                 if isinstance(message, AssistantMessage):
+                    last_blocks = [type(b).__name__ + (f":{b.text[:120]}" if isinstance(b, TextBlock) else "") for b in message.content]
                     for block in message.content:
                         if isinstance(block, ToolUseBlock):
                             log.info("agent code:\n%s", block.input.get("code", ""))
@@ -148,5 +153,13 @@ async def run_query(task: str, options: ClaudeAgentOptions, timeout_s: int) -> s
             budget.current.note_hit("call_usd", msg)
             raise BudgetExceeded(msg)
     if result is None or result.is_error or not result.result:
-        raise AgentError(f"agent run failed: {getattr(result, 'subtype', 'no result')}")
+        if result is None:
+            raise AgentError("agent run failed: no result")
+        # The agent's own last words or the API's error text (never page text: the agent has no way to see any);
+        # capped so a long message cannot flood the log.
+        detail = " ".join((result.result or "").split())[:300] or "empty answer"
+        raise AgentError(
+            f"agent run failed: {result.subtype}, is_error={result.is_error}, turns={result.num_turns}, answer: {detail}, "
+            f"last message: {last_blocks or 'none'}"
+        )
     return result.result

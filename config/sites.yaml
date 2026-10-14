@@ -10,6 +10,9 @@
 #   login_url:      the page with the login form; credentials come from .env (SONAR_<SITE>_USERNAME / _PASSWORD)
 #   max_list_pages: safety cap on list steps ("load more" / next page) per run (default 10)
 #   first_run_days: with an empty database, how many days back to collect (default 3)
+#   account:        label of the login this entry uses, shown beside its matches in the report. Two accounts on one site = two entries
+#   attachment_note: true adds 'please review the attached documents' to every matched posting of this site in the email
+#                   (for sites whose documents cannot be seen without an account step). Other sites get it when the posting links to document files
 sites:
   - name: canadabuys
     start_url: "https://canadabuys.canada.ca/en/tender-opportunities?status%5B0%5D=87&current_tab=t&record_per_page=50&order=pub_ifnot_amended&sort=desc"
@@ -24,3 +27,16 @@ sites:
         hint: "We are already logged in, on the Supplier Area dashboard. The list is the menu link 'Opportunities Open to All Suppliers' (also under Sourcing > Published Opportunities, tab Current Opportunities). Typed addresses give 403 here: reach everything by clicking, and return to the list by clicking that menu link again. Do not go back to the public login page; that leaves the logged-in area."
     requires_login: true
     read_post_paths: ["/esop/toolkit/opportunity/current/list-async.si"]  # the list's own sort/refresh request: a POST that only reads
+  - &ariba  # anchor: the second account below reuses everything except its name and label
+    name: ariba
+    account: "itnetrfp@itnet.ca"
+    start_url: "https://service.ariba.com/Sourcing.aw/109555011"
+    login_url: "https://service.ariba.com/Sourcing.aw/109555011"
+    allowed_hosts: ["service.ariba.com", "s1.ariba.com", "canada.supplier.ariba.com"]  # s1 holds the supplier iframe with the listings; canada.supplier is where the event links point
+    hint: "You are already logged in and are in the dashboard. The listings are in an 'Events' table inside an embedded frame, grouped by status; the simple link list of the page does not show it, so read the full DOM tree with pierce=True. The group 'Status: Open' is folded shut: click its small arrow (the triangle at the left of its label), wait a few seconds for the rows to load, then read the rows. Do not click the other groups."
+    requires_login: true
+    attachment_note: true  # event documents sit behind 'Accept Prerequisites', which Sonar never does
+    read_post_paths: ["/Sourcing.aw/109555011/ad/loginPage/SSOActions"]  # login hand-off form (encoded return addresses only); sends no user data
+  - <<: *ariba  # second Ariba login: own browser profile, watermark and credentials (SONAR_ARIBA2_USERNAME / _PASSWORD in .env)
+    name: ariba2
+    account: "rfp@itnet.ca"

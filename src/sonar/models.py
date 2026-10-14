@@ -76,6 +76,8 @@ class ReportMatch(BaseModel):
     solicitation_number: str | None = None  # None if the posting was not read; may end "(unsure, please verify)"
     supply_arrangement: str | None = None  # "N/A" when none applies
     department: str | None = None
+    review_note: str | None = None  # set when the posting has (or probably has) documents the reader should open
+    account: str | None = None  # which login found it (sites.yaml `account`), so a tester opens it with the right one
     hits: list[KeywordHit]
 
 

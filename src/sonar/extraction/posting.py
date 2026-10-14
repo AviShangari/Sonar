@@ -44,7 +44,7 @@ async def extract_listing(site: str, opened: OpenedListing) -> Listing:
         site=site,
         job_id=opened.job_id,
         url=opened.url,
-        title=(await page.title()).strip() or None,
+        title=(opened.title or "").strip() or (await page.title()).strip() or None,  # the list row's title first: tab titles are often generic
         posting_text=text,
         raw_html=await page.content(),
         fields={

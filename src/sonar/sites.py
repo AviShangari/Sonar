@@ -24,6 +24,13 @@ class SiteConfig(BaseModel):
     login_url: str | None = None  # the page with the login form; needed when requires_login is true
     max_list_pages: int = 10  # safety cap on list steps (load more / next page) per run
     first_run_days: int = 3  # with an empty database, collect postings from this many days back
+    # True: every matched posting of this site carries the note 'please review the attached documents' in the email,
+    # for sites whose documents cannot be seen without an account step (SAP Ariba prerequisites).
+    attachment_note: bool = False
+    # A plain label for the login this entry uses ("Ariba account 1"), shown next to each of its matches so a tester
+    # knows which account can open the posting. Never a password. One entry per account: each gets its own
+    # browser profile, watermark and failure handling, and credentials SONAR_<NAME>_USERNAME / _PASSWORD.
+    account: str | None = None
 
     @field_validator("read_post_paths")
     @classmethod
@@ -71,3 +78,13 @@ class SiteConfig(BaseModel):
 def load_sites(path: Path = DEFAULT_PATH) -> list[SiteConfig]:
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     return [SiteConfig(**item) for item in data["sites"]]
+
+
+def site_accounts(path: Path = DEFAULT_PATH) -> dict[str, str]:
+    """Site name to account label, for the sites that set one."""
+    return {s.name: s.account for s in load_sites(path) if s.account}
+
+
+def note_sites(path: Path = DEFAULT_PATH) -> frozenset[str]:
+    """Names of the sites whose matched postings always get the 'review the attached documents' note."""
+    return frozenset(s.name for s in load_sites(path) if s.attachment_note)

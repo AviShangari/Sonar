@@ -72,3 +72,24 @@ def test_site_posting_texts_returns_only_that_sites_texts() -> None:
             run_id,
         )
     assert sorted(queries.site_posting_texts(engine, "a")) == ["text J1", "text J2"]
+
+
+def test_the_stored_title_is_the_list_rows_title_not_the_generic_tab_title() -> None:
+    import asyncio
+
+    from playwright.async_api import async_playwright
+
+    from sonar.extraction.posting import extract_listing
+    from sonar.navigation.base import OpenedListing
+
+    async def scenario(row_title: str | None) -> str | None:
+        async with async_playwright() as pw:
+            browser = await pw.chromium.launch(headless=True)
+            page = await browser.new_page()
+            await page.set_content("<html><head><title>Ariba Spend Management</title></head><body><p>Event text</p></body></html>")
+            listing = await extract_listing("demo", OpenedListing(job_id="X1", url="https://a.example.com/x", page=page, title=row_title))
+            await browser.close()
+            return listing.title
+
+    assert asyncio.run(scenario("Electronic Health Record Platform (EHRP)")) == "Electronic Health Record Platform (EHRP)"
+    assert asyncio.run(scenario(None)) == "Ariba Spend Management"  # no row title: the tab title, as before

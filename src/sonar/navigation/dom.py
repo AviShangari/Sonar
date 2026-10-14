@@ -279,7 +279,8 @@ class DomNavigator:
         last_date: date | None = None
         stopped = False
         for step in range(self.site.max_list_pages):
-            found = parse_agent_page(await self.collect(self.site, raw_rows))
+            answer = await self.collect(self.site, raw_rows)
+            found = parse_agent_page(answer)
             if step == 0:
                 self.route_note = found.route_note
             raw_rows += len(found.links)
@@ -320,7 +321,7 @@ class DomNavigator:
         if not usable_rows:
             # A site whose list shows zero listings is a failure, not a quiet day. (A list whose rows
             # are all older than the cutoff is a quiet day: nothing new was posted.)
-            raise CollectionError(f"{self.site.name}: no usable result links found")
+            raise CollectionError(f"{self.site.name}: no usable result links found (the agent answered: {answer[:500]!r})")
         shared = {url for url, n in Counter(c.url for c in queue).items() if n > 1}
         for cand in queue:
             cand.click_only = cand.url in shared  # one address cannot be two postings: only a click can tell them apart
@@ -395,7 +396,7 @@ class DomNavigator:
                             f"their titles (last: job {cand.job_id}, {exc}); stopping the site"
                         )
                 continue
-            return OpenedListing(job_id=cand.job_id, url=cand.url, page=page, listed_date=cand.listed_date)
+            return OpenedListing(job_id=cand.job_id, url=cand.url, page=page, listed_date=cand.listed_date, title=cand.title)
         return None
 
     async def _known_after_open(self, opened: OpenedListing) -> bool:
@@ -422,17 +423,22 @@ class DomNavigator:
         found_any = False
         for page in pages:
             try:
-                links = page.get_by_role("link", name=cand.title, exact=True)
-                if await links.count() <= nth:
+                # The list may sit inside an embedded frame, so every frame of the tab is searched, in page order.
+                matches = []
+                for frame in page.frames:
+                    links = frame.get_by_role("link", name=cand.title, exact=True)
+                    matches += [links.nth(i) for i in range(await links.count())]
+                if len(matches) <= nth:
                     continue
                 found_any = True
                 async with page.expect_navigation(wait_until="domcontentloaded", timeout=30_000):
-                    await links.nth(nth).click(timeout=15_000)
+                    await matches[nth].click(timeout=15_000)
                 if await shows_title(page, cand.title):
                     log.info("site=%s job_id=%s step=open outcome=ok via=click", self.site.name, cand.job_id)
                     self.click_succeeded = True
                     return OpenedListing(
-                        job_id=cand.job_id, url=normalize_url(page.url), page=page, listed_date=cand.listed_date, in_list_tab=True
+                        job_id=cand.job_id, url=normalize_url(page.url), page=page, listed_date=cand.listed_date, in_list_tab=True,
+                        title=cand.title,
                     )
                 await page.go_back()  # clicked something else: restore the list and give up on this one
             except Exception as exc:

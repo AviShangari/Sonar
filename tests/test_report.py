@@ -4,7 +4,7 @@ from sonar.matching.keywords import KeywordMatcher
 from sonar.matching.run import match_new_listings
 from sonar.models import KeywordHit, Listing, Report, ReportMatch
 from sonar.report.build import build_report
-from sonar.report.render import highlight, render_html, render_text, write_report
+from sonar.report.render import highlight, render_email_html, render_email_text, render_html, render_text, write_report
 
 
 def store(engine, run_id: int, job_id: str, body: str, title: str = "A tender", listed: str = "2026-10-09") -> None:
@@ -110,3 +110,62 @@ def test_a_single_digit_day_has_no_leading_zero() -> None:
     from sonar.report.build import _long_date_time
 
     assert _long_date_time(datetime(2026, 10, 5, 9, 5)) == "October 5, 2026, 09:05 "  # %Z is empty for a naive time
+
+
+def test_document_links_are_detected_in_saved_html() -> None:
+    from sonar.extraction.documents import has_document_links
+
+    assert has_document_links('<a href="/sites/default/files/tender/notice-123.pdf">Notice</a>')
+    assert has_document_links("<a href='https://x.example/a/Specs.DOCX?download=1'>Specs</a>")
+    assert not has_document_links('<a href="/en/privacy">Privacy</a> <a href="/about.html">About</a>')
+    assert not has_document_links('<p>see notice.pdf in the text, no link</p>')
+    assert not has_document_links(None)
+
+
+def test_the_review_note_appears_for_flagged_sites_and_for_postings_with_document_links() -> None:
+    from sonar.report.build import REVIEW_NOTE
+
+    engine = make_engine("sqlite://")
+    run_id = queries.start_run(engine)
+    for job_id, site, html in [
+        ("P1", "ariba", "<p>no files</p>"),  # flagged site: always
+        ("P2", "demo", '<a href="/files/specs.pdf">Specs</a>'),  # a document link
+        ("P3", "demo", "<p>nothing attached</p>"),  # neither
+    ]:
+        queries.add_listing(
+            engine,
+            Listing(site=site, job_id=job_id, url=f"https://x.example/{job_id}", title=job_id, posting_text="SAP help",
+                    raw_html=html, text_hash=job_id, fields={}),
+            run_id,
+        )
+    for site in ("ariba", "demo"):
+        match_new_listings(engine, KeywordMatcher(["SAP"]), "keywords", site, run_id)
+    report = build_report(engine, run_id, "keywords", note_sites=frozenset({"ariba"}))
+    notes = {m.title: m.review_note for m in report.matches}
+    assert notes == {"P1": REVIEW_NOTE, "P2": REVIEW_NOTE, "P3": None}
+    html, text = render_email_html(report), render_email_text(report)
+    assert html.count(REVIEW_NOTE) == 2 and text.count(REVIEW_NOTE) == 2  # one line per flagged match, none for P3
+    assert {m.title: m.review_note for m in build_report(engine, run_id, "keywords").matches}["P1"] is None
+
+
+def test_each_match_names_the_account_that_found_it() -> None:
+    engine = make_engine("sqlite://")
+    run_id = queries.start_run(engine)
+    for site in ("ariba", "ariba2", "demo"):
+        queries.add_listing(
+            engine,
+            Listing(site=site, job_id="E1", url=f"https://x.example/{site}", title=f"Event on {site}",
+                    posting_text="SAP help", text_hash=site, fields={}),
+            run_id,
+        )
+        match_new_listings(engine, KeywordMatcher(["SAP"]), "keywords", site, run_id)
+    accounts = {"ariba": "Ariba account 1", "ariba2": "Ariba account 2"}
+    report = build_report(engine, run_id, "keywords", accounts=accounts)
+    assert {m.title: m.account for m in report.matches} == {
+        "Event on ariba": "Ariba account 1", "Event on ariba2": "Ariba account 2", "Event on demo": None,
+    }  # the same event ID under two accounts stays two listings
+    for rendered in (render_email_html(report), render_email_text(report), render_html(report), render_text(report)):
+        assert "Ariba account 1" in rendered and "Ariba account 2" in rendered
+    assert render_email_text(report).count("Account:") == 2  # none for the site without an account
+    plain = build_report(engine, run_id, "keywords")  # no accounts configured: no column, no label
+    assert "Account" not in render_email_html(plain) and "Account:" not in render_email_text(plain)

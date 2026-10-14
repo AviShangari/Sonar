@@ -14,9 +14,11 @@ Supply arrangement: {{ m.supply_arrangement or "not available" }}
 Solicitation number: {{ m.solicitation_number or "not available" }}
 Issuing department: {{ m.department or "not available" }}
 Due date: {{ m.closing_date or "not available" }}
-Description:
+{% if m.account %}Account: {{ m.account }}
+{% endif %}Description:
 {{ (m.summary or "Summary not available")|wrap("    ") }}
-{% else %}
+{% if m.review_note %}Note: {{ m.review_note }}
+{% endif %}{% else %}
 
 No new postings matched your keywords in this run.
 {% endfor %}

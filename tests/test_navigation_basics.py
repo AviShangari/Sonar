@@ -41,6 +41,15 @@ def test_normalize_url_strips_query_fragment_and_resolves_relative_links() -> No
     assert normalize_url("https://a.com/x/") == "https://a.com/x"
 
 
+def test_normalize_url_keeps_only_the_id_parameter_so_postings_that_differ_only_by_it_stay_apart() -> None:
+    a = normalize_url("https://s.example.com/ad/webjumper?itemID=AAA&awcharset=UTF-8&utm_source=mail#x")
+    b = normalize_url("https://s.example.com/ad/webjumper?itemID=BBB&awcharset=UTF-8")
+    assert a == "https://s.example.com/ad/webjumper?itemID=AAA"  # the tracking and charset parts are still dropped
+    assert a != b
+    assert job_id_from_url("https://s.example.com/ad/webjumper?itemID=AAA&awcharset=UTF-8") == "AAA"
+    assert normalize_url("https://a.com/x?sort=date&page=2") == "https://a.com/x"  # no ID parameter: nothing kept
+
+
 @pytest.mark.parametrize(
     ("url", "expected"),
     [
@@ -128,3 +137,21 @@ def test_an_unknown_timezone_is_rejected_at_startup() -> None:
 
     with pytest.raises(ValidationError):
         Settings(timezone="Mars/Olympus")
+
+
+def test_the_two_ariba_accounts_are_separate_entries_with_their_own_login(monkeypatch: pytest.MonkeyPatch) -> None:
+    from sonar.secrets import site_credentials
+    from sonar.sites import site_accounts
+
+    for name, value in [("SONAR_ARIBA_USERNAME", "u1"), ("SONAR_ARIBA_PASSWORD", "p1"),
+                        ("SONAR_ARIBA2_USERNAME", "u2"), ("SONAR_ARIBA2_PASSWORD", "p2")]:
+        monkeypatch.setenv(name, value)
+    assert site_credentials("ariba") == ("u1", "p1") and site_credentials("ariba2") == ("u2", "p2")
+
+    sites = {s.name: s for s in load_sites()}
+    one, two = sites["ariba"], sites["ariba2"]
+    assert (one.account, two.account) == ("Ariba account 1", "Ariba account 2")
+    assert site_accounts() == {"ariba": "Ariba account 1", "ariba2": "Ariba account 2"}
+    # Same site settings, so the second account gets the same guards and hints as the first.
+    assert one.model_copy(update={"name": "", "account": None}) == two.model_copy(update={"name": "", "account": None})
+    assert one.read_post_paths == two.read_post_paths and one.allowed_hosts == two.allowed_hosts

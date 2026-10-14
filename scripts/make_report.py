@@ -8,8 +8,9 @@ from sonar.config import load_settings
 from sonar.db.tables import make_engine
 from sonar.report.build import build_report
 from sonar.report.render import write_report
+from sonar.sites import note_sites, site_accounts
 
 settings = load_settings()
-report = build_report(make_engine(settings.database_url), int(sys.argv[1]), settings.matcher, settings.tz)
+report = build_report(make_engine(settings.database_url), int(sys.argv[1]), settings.matcher, settings.tz, note_sites(), site_accounts())
 for path in write_report(report, settings.report_path):
     print(path)

@@ -91,6 +91,8 @@ Create folders and files as the build reaches them. Do not scaffold empty placeh
 
 - Every keyword in `config/keywords.yaml` is checked.
 - Case-insensitive, whole-word matching (no substring hits); multi-word keywords match as phrases.
+- A generic keyword may carry `needs_context: true`: it then counts only if the posting has a `context_terms` word (the client's areas: recruitment, consulting, tech) or also has a specific keyword hit. Specific keywords match alone. Never gate a keyword that already means IT.
+- A keyword entry may carry `ignore_inside`: phrases it does not count in (`SAP` inside `SAP Ariba`). Use it for portal or boilerplate wording, never to hide a real topic. Bare "Microsoft" is not a keyword (it matched Teams meeting links); the Microsoft 365 / Dynamics stack is listed by product.
 - Report which keywords matched and a short snippet around each.
 
 ## Safety rules (non-negotiable)

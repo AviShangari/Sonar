@@ -29,11 +29,14 @@ ALLOWED_METHODS = {
     "get", "lower", "upper", "strip", "startswith", "endswith", "items", "keys", "values",
     "append", "split", "join", "isdigit",
 }
-# Read-only DevTools queries (finding elements and where to click). No Runtime.*, no Fetch.*,
+# Read-only DevTools queries (finding elements and where to click), plus one scroll:
+# DOM.scrollIntoViewIfNeeded only moves the page's scroll position, so a click lands on screen
+# (a headless window is short and a click outside it does nothing). No Runtime.*, no Fetch.*,
 # no Network.*, no Input.* (clicks go through click_at_xy), no Page.navigate.
 ALLOWED_CDP = {
     "Accessibility.enable", "Accessibility.getFullAXTree", "Accessibility.queryAXTree",
-    "DOM.enable", "DOM.getDocument", "DOM.getBoxModel", "DOM.describeNode", "Page.getLayoutMetrics",
+    "DOM.enable", "DOM.getDocument", "DOM.getBoxModel", "DOM.describeNode", "DOM.scrollIntoViewIfNeeded",
+    "Page.getLayoutMetrics",
 }
 
 _ALLOWED_NODES = (

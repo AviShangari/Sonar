@@ -1,5 +1,6 @@
 """Loads the mode flags and run settings from config/settings.yaml."""
 
+import os
 from datetime import date, datetime
 from pathlib import Path
 from typing import Literal
@@ -82,4 +83,7 @@ class Settings(BaseModel):
 
 
 def load_settings(path: Path = DEFAULT_PATH) -> Settings:
-    return Settings(**yaml.safe_load(path.read_text(encoding="utf-8")))
+    values = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if os.environ.get("SONAR_HEADLESS", "").lower() in ("1", "true", "yes"):
+        values["headless"] = True  # the Docker image sets this: a container has no screen, whatever settings.yaml says
+    return Settings(**values)

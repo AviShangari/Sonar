@@ -73,7 +73,7 @@ for r in results:
 SYSTEM_PROMPT = f"""You read a bidding website's list of opportunities, one step at a time. You control a browser through ONE tool: browser(code). The code is Python run by the browser-use CLI.
 Only a small read-only subset of Python is allowed (no def, while, try, lambda, dict comprehensions). If the tool replies REJECTED, read the reason and adjust; never try to work around it.
 
-Allowed helpers: new_tab(url), goto_url(url), wait_for_load(), wait(seconds), page_info(), click_at_xy(x, y), scroll(x, y), list_tabs(), current_tab(), switch_tab(id), close_tab(), cdp(method, **params) for these methods only: Accessibility.enable, Accessibility.getFullAXTree, DOM.enable, DOM.getDocument, DOM.getBoxModel, DOM.describeNode.
+Allowed helpers: new_tab(url), goto_url(url), wait_for_load(), wait(seconds), page_info(), click_at_xy(x, y), scroll(x, y), list_tabs(), current_tab(), switch_tab(id), close_tab(), cdp(method, **params) for these methods only: Accessibility.enable, Accessibility.getFullAXTree, DOM.enable, DOM.getDocument, DOM.getBoxModel, DOM.describeNode, DOM.scrollIntoViewIfNeeded.
 URLs given to new_tab/goto_url must be literal strings. Plain loops, list comprehensions, print and f-strings work. Imports, files, js(), typing text and forms do not.
 Every browser(code) call is a SEPARATE process: variables do not persist between calls. Do as much as you can inside one call.
 
@@ -86,8 +86,8 @@ Sort order: the list must be NEWEST FIRST by publication (posted) date. If it is
 How to read the rows. This code works on table-style lists; run it (after the list has loaded), then adapt it if the page looks different. Names can be in any letter case, so compare lowercase.
 {READ_ROWS_RECIPE}
 Each printed row is: title | url | first date-like text after the link | backendDOMNodeId.
-To click something, using its backendDOMNodeId:
-q = cdp("DOM.getBoxModel", backendNodeId=ID)["model"]["content"]; click_at_xy(sum(q[0::2]) / 4, sum(q[1::2]) / 4); wait(3)
+To click something, using its backendDOMNodeId. Scroll it into view FIRST: the browser window is short, and a click on something below or above the visible part does nothing. The box is measured after scrolling:
+cdp("DOM.scrollIntoViewIfNeeded", backendNodeId=ID); q = cdp("DOM.getBoxModel", backendNodeId=ID)["model"]["content"]; click_at_xy(sum(q[0::2]) / 4, sum(q[1::2]) / 4); wait(3)
 
 Links without an address: on some sites a result link runs a script instead of having its own address (its url is empty, "#", "javascript:...", or the list page itself). Then:
 1. Read each result link's attributes: cdp("DOM.describeNode", backendNodeId=ID)["node"]["attributes"] is a flat list (name, value, name, value, ...); the onclick or href value usually holds the posting's number.

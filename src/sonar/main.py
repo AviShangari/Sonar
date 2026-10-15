@@ -123,10 +123,11 @@ def print_summary(run_id: int, status: str, outcomes: list[SiteOutcome]) -> None
     for o in outcomes:
         if o.error:
             print(f"  {o.site}: FAILED - {o.error}")
-            continue
+            if not (o.stored or o.decisions):
+                continue
         print(
-            f"  {o.site}: {o.stored} new stored, {o.skipped_seen} already known, {o.failed_postings} failed, "
-            f"{len(o.decisions or [])} scored, {o.matches} matches"
+            f"  {'  ' if o.error else ''}{o.site}: {o.stored} new stored, {o.skipped_seen} already known, "
+            f"{o.failed_postings} failed, {len(o.decisions or [])} scored, {o.matches} matches"
         )
         if o.route_message:
             print(f"    {o.route_message}")

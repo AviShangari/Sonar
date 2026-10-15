@@ -49,10 +49,15 @@ class SiteOutcome:
 
 
 async def collect_site(
-    site: SiteConfig, settings: Settings, engine: Engine, run_id: int, days: int | None = None, max_new: int | None = None
+    site: SiteConfig, settings: Settings, engine: Engine, run_id: int, days: int | None = None, max_new: int | None = None,
+    outcome: SiteOutcome | None = None,
 ) -> SiteOutcome:
-    """Navigate one site and store its new postings. `max_new` is a test cap, not for real runs."""
-    outcome = SiteOutcome(site.name)
+    """Navigate one site and store its new postings. `max_new` is a test cap, not for real runs.
+
+    A site-wide failure still raises. Pass an `outcome` to keep what was stored before the failure:
+    the counts are written into it as the site is worked."""
+    if outcome is None:
+        outcome = SiteOutcome(site.name)
     # The stop point is the watermark, which only a clean run moves. A capped or failed run leaves it
     # where it was, so the next run re-reads down to it (known postings are skipped by dedup).
     cutoff = get_watermark(engine, site.name) or settings.today() - timedelta(days=days if days is not None else site.first_run_days)
@@ -118,11 +123,20 @@ async def run_site(
     site: SiteConfig, settings: Settings, engine: Engine, matcher: Matcher, run_id: int,
     days: int | None = None, max_new: int | None = None,
 ) -> SiteOutcome:
-    """Collect, then match everything of this site that has no decision yet. Never raises."""
+    """Collect, then match everything of this site that has no decision yet. Never raises.
+
+    Matching happens even when collection failed: postings stored before the failure (and any left
+    unscored by earlier runs) are matched and reach the report, and the failure is still reported."""
+    outcome = SiteOutcome(site.name)
     try:
-        outcome = await collect_site(site, settings, engine, run_id, days, max_new)
-        outcome.decisions = match_new_listings(engine, matcher, settings.matcher, site.name, run_id)
+        await collect_site(site, settings, engine, run_id, days, max_new, outcome=outcome)
     except Exception as exc:
         log.exception("site=%s step=run outcome=failed", site.name)
-        return SiteOutcome(site.name, error=f"{type(exc).__name__}: {exc}")
+        outcome.error = f"{type(exc).__name__}: {exc}"
+    try:
+        outcome.decisions = match_new_listings(engine, matcher, settings.matcher, site.name, run_id)
+    except Exception as exc:
+        log.exception("site=%s step=match outcome=failed", site.name)
+        message = f"matching failed: {type(exc).__name__}: {exc}"
+        outcome.error = f"{outcome.error}; {message}" if outcome.error else message
     return outcome

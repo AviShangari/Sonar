@@ -5,6 +5,16 @@ Failure handling: [Listing Matcher: Failure Modes and Handling](https://claude.a
 
 These links are private claude.ai pages that coding agents cannot open. Everything an agent needs is in this file and `AGENTS.md`.
 
+## Right now
+
+Refresh this block on every push (see the Workflow rule in `AGENTS.md`). Last updated 2026-10-15.
+
+- **`main`** is at PR #37 (email on by default, merged). Nothing else is waiting to merge.
+- **Active branch:** `docs/plan-sync-rule`, pushed, PR open, awaiting merge (the developer opens and merges it on GitHub): the "plan.md must say where we are" rule in `AGENTS.md`, this block, and the `dev` branch docs.
+- **Decided (2026-10-15), written into the docs on this branch:** a `dev` branch. `main` = stable, Docker-tested merges only; `dev` = where work is combined; feature branches start from `dev` (Branching section, decision log, `AGENTS.md` Workflow). **Not done yet:** create and push `dev` from `origin/main` after this branch merges, and set it as the GitHub default branch. Until `dev` exists, this branch targets `main`.
+- **Next build step:** Jev matcher (`matching/jev.py`). Jev is reachable through OpenRouter (`POST https://openrouter.ai/api/alpha/decisions`, model `typesafe/jev-1.13`, same key as the navigation and summary models), so no separate TypeSafe account. Plan: yes/no and choice questions about the posting, with the client's "what we do" text in the question instructions (`config/company.yaml`, to write with the client). Needs the developer's go-ahead before any paid call.
+- **Small items waiting:** fix the stale Ariba-label test; real cost caps and an OpenRouter key spending limit before any scheduled run. Full list: see the build order and open questions below.
+
 ## Current status
 
 - Repo created, `uv init` done, dependencies installed, Chromium installed, context files committed.
@@ -258,6 +268,7 @@ If time runs out:
 | 2026-10-14 | Scope: the team lead needs a demo of the automation running in Docker, not the Azure deployment. VM, systemd timer and the scheduler are on hold; Step 4 (cost caps, spending limit) still applies to the demo |
 | 2026-10-11 | Priority: before scheduling or deploying, prove the agent on a second site, preferably one with a login (login by our code only, session expiry and 2FA handling as in Failure handling). CanadaBuys alone does not show the navigator is generic. Check each site's terms allow automated read-only access before building |
 | 2026-10-15 | `email` is now ON by default (`config.py` default and `settings.yaml` both `true`), replacing the 2026-10-11 "off by default". It is recorded in AGENTS.md ("Email") so no agent turns it off without the developer's say-so |
+| 2026-10-15 | Branching: a `dev` branch is added. `main` holds only stable code we can run in Docker for a demo and changes only by pull request from `dev`; every feature branch starts from `dev`. Why: every merge to `main` could break a demo, and runs cost money and touch real sites. "Stable" = full tests pass plus one supervised Docker run with email. Promote often so `dev` does not run far ahead; promotions are merge commits, not squashes. Replaces the "branch from `main`" rule |
 | 2026-10-14 | Hints are hand-written recipes, not auto-saved from runs. An automatic "replay the last successful route" would put page-derived text into a prompt, which the 2026-10-13 rediscovery decision (and the route-note rule) rules out. A person reads the logged run, writes the steps, and reviews them; the agent is told to trust the page if a step fails |
 
 ## Notes for agents on this machine (Windows)
@@ -268,11 +279,13 @@ If time runs out:
 
 ## Branching
 
-- `main` is always working code.
-- One branch per build step, named by type: `feat/keyword-matcher`, `feat/dom-navigator`, `fix/session-expiry`, `docs/readme`.
-- Merge to `main` through a pull request once tests pass, then delete the branch.
+- `main` is stable code only: what we can run in Docker for a demo. It changes only through a pull request from `dev`.
+- `dev` is where work is combined and tested together. Never commit to it directly.
+- One branch per build step, started from an up-to-date `dev`, named by type: `feat/keyword-matcher`, `feat/dom-navigator`, `fix/session-expiry`, `docs/readme`. Merge it into `dev` through a pull request once tests pass, then delete the branch.
+- Promote `dev` to `main` often, after each finished piece of work, with a pull request and a normal merge commit (never squash, so the two branches keep one history). "Stable" means: the full test suite passes, and one supervised Docker run with email works.
+- A hotfix for `main` starts from `main`; after it merges, merge `main` back into `dev` so they do not drift apart. Keep this rare.
 - Mark demo-ready versions with tags on `main`: `demo-1-keywords`, `demo-2-jev`.
-- No long-lived branch per version: keyword vs Jev and vision vs DOM are config switches, not separate code.
+- Keyword vs Jev and vision vs DOM are config switches, not separate branches.
 
 ## Open questions
 

@@ -123,10 +123,13 @@ A scheduled run must use `openrouter` (enforce this when the scheduler is built)
 - Read `plan.md` at the start of every session; it holds current status, build order and decisions.
 - One build step at a time. Explain choices briefly; the developer is learning agent building.
 - The developer is new to dev tooling. Use plain language, define each term once, and say what you created or changed and what already existed.
-- Create a branch per build step (`feat/...`, `fix/...`, `docs/...`) from an up-to-date `main`. Never commit directly to `main`.
+- Create a branch per build step (`feat/...`, `fix/...`, `docs/...`) from an up-to-date `dev` and merge it back into `dev` by pull request. Never commit directly to `main` or `dev`. `main` holds only stable, Docker-tested code and changes only through a pull request from `dev` (see "Branching" in `plan.md`).
 - Ask before adding dependencies or changing the architecture.
 - When a step is done: tick it off in `plan.md`, update "Current status", and add any new decision to the decision log.
 - Keep `plan.md` current at all times: update it immediately whenever something changes (a PR merges, a decision is made, scope or priority shifts, a finding changes the design) and at the end of every phase. Do not leave it for later or for the end of the session.
+- **`plan.md` must always say where we are, because every new chat starts with no memory.**
+  - **Every push:** when the developer approves a push, the same commit also updates `plan.md` (Current status): what changed, the branch name, and "pushed, PR open, awaiting merge". Never push code without the matching `plan.md` update.
+  - **Every session start:** run `git fetch`, check what reached `origin/main` (`git log origin/main`), and change the notes for merged branches to "merged (PR #N)" before any other work. The developer merges on GitHub, so never write "merged" before git shows it.
 
 ## Email
 

@@ -7,6 +7,9 @@
 <p style="margin:0 0 16px;padding:10px;background:#fdecea;border:1px solid #d93025;color:#8a1c14;white-space:pre-wrap;"><strong>{{ "THIS RUN WAS INCOMPLETE" if report.status == "partial" else "THIS RUN FAILED" }}</strong>
 {{ report.failed_sites }}</p>
 {% endif %}
+{% if report.unscored %}
+<p style="margin:0 0 16px;padding:10px;background:#fff8e1;border:1px solid #f9ab00;color:#6b4a00;"><strong>{{ report.unscored }} {{ "posting" if report.unscored == 1 else "postings" }} could not be scored</strong> because the {{ report.matcher|upper }} matcher was unavailable. {{ "It is" if report.unscored == 1 else "They are" }} not treated as non-matches and will be tried again in the next run.</p>
+{% endif %}
 {% if report.matches %}
 {% set show_account = report.matches|selectattr("account")|list|length > 0 %}
 <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:13px;">
@@ -22,7 +25,7 @@
     <tr style="vertical-align:top;">
       <td style="border:1px solid #ccc;padding:6px 8px;white-space:nowrap;">{{ m.posted_date or m.listed_date or "not found, please verify" }}</td>
       <td style="border:1px solid #ccc;padding:6px 8px;">{{ m.supply_arrangement or "not available" }}</td>
-      <td style="border:1px solid #ccc;padding:6px 8px;"><a href="{{ m.url|safe_url }}" style="color:#1a0dab;">{{ m.title }}</a></td>
+      <td style="border:1px solid #ccc;padding:6px 8px;"><a href="{{ m.url|safe_url }}" style="color:#1a0dab;">{{ m.title }}</a>{% if m.needs_review %}<br><span style="display:inline-block;margin-top:4px;padding:1px 6px;background:#fff8e1;border:1px solid #f9ab00;color:#6b4a00;font-size:12px;font-weight:bold;">Needs review, not confident</span>{% endif %}</td>
       <td style="border:1px solid #ccc;padding:6px 8px;">{{ m.solicitation_number or "not available" }}</td>
       <td style="border:1px solid #ccc;padding:6px 8px;min-width:260px;">{{ m.summary or "Summary not available" }}</td>
       <td style="border:1px solid #ccc;padding:6px 8px;">{{ m.department or "not available" }}</td>
@@ -40,7 +43,7 @@
   </tbody>
 </table>
 {% else %}
-<p>No new postings matched your keywords in this run.</p>
+<p>No new postings matched {{ "your keywords" if report.matcher == "keywords" else "" }} in this run.</p>
 {% endif %}
 </body>
 </html>

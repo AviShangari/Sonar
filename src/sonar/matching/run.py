@@ -42,14 +42,21 @@ def match_new_listings(engine: Engine, matcher: Matcher, matcher_name: str, site
         return []
     texts = site_posting_texts(engine, site)
     boilerplate = find_boilerplate(texts)
-    warn_keywords_in_boilerplate(site, texts, boilerplate, matcher)
+    if matcher_name == "keywords":  # the check runs the matcher on every stripped line: free for keywords, a paid call each for Jev
+        warn_keywords_in_boilerplate(site, texts, boilerplate, matcher)
     decisions = []
     for listing in listings:
         result = matcher.match(strip_boilerplate(listing.posting_text, boilerplate))
         decision = Decision(
             listing_id=listing.id, run_id=run_id, matcher=matcher_name, matched=result.matched,
-            details=result.model_dump(),
+            score=result.score, details=result.model_dump(),
         )
         add_decision(engine, decision)
         decisions.append(decision)
+    unscored = sum(d.matched is None for d in decisions)
+    cost = sum(d.details.get("cost_usd") or 0.0 for d in decisions)
+    log.info(
+        "site=%s step=match matcher=%s outcome=done scored=%d unscored=%d cost_usd=%.6f",
+        site, matcher_name, len(decisions) - unscored, unscored, cost,
+    )
     return decisions

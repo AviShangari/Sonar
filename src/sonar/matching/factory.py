@@ -2,10 +2,13 @@
 
 from sonar.config import Settings
 from sonar.matching.base import Matcher
+from sonar.matching.jev import build_jev_matcher
 from sonar.matching.keywords import KeywordMatcher, load_context_terms, load_keywords
 
 
 def build_matcher(settings: Settings) -> Matcher:
     if settings.matcher == "keywords":
         return KeywordMatcher(load_keywords(settings.keywords_path), load_context_terms(settings.keywords_path))
+    if settings.matcher == "jev":
+        return build_jev_matcher(settings)
     raise NotImplementedError(f"matcher '{settings.matcher}' is not built yet")

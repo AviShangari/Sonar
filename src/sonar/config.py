@@ -7,7 +7,7 @@ from typing import Literal
 from zoneinfo import ZoneInfo
 
 import yaml
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_PATH = ROOT / "config" / "settings.yaml"
@@ -22,6 +22,11 @@ class Settings(BaseModel):
     matcher: Literal["keywords", "jev"] = "keywords"
     database_url: str = "sqlite:///data/sonar.db"
     keywords_file: str = "config/keywords.yaml"
+    company_file: str = "config/company.yaml"  # what the client does: the Jev question text (matcher: jev only)
+    jev_model: str = "typesafe/jev-1.13"  # pinned on purpose: thresholds only mean something for one model version
+    jev_match_threshold: float = 0.6  # probability at or above this: a match
+    jev_review_threshold: float = 0.3  # from here up to the match threshold: a match flagged "needs review"; below: not a match
+    jev_max_chars: int = 12000  # posting text sent to Jev is cut to this length
     timezone: str = "America/Toronto"  # the business's time zone: report times and "today" for date windows
     headless: bool = False
     cdp_port: int = 9333
@@ -53,6 +58,12 @@ class Settings(BaseModel):
             raise ValueError(f"unknown time zone '{name}' (use a name like America/Toronto)") from exc
         return name
 
+    @model_validator(mode="after")
+    def _jev_thresholds_in_order(self) -> "Settings":
+        if not 0 <= self.jev_review_threshold < self.jev_match_threshold <= 1:
+            raise ValueError("jev thresholds must satisfy 0 <= jev_review_threshold < jev_match_threshold <= 1")
+        return self
+
     @property
     def tz(self) -> ZoneInfo:
         return ZoneInfo(self.timezone)
@@ -80,6 +91,10 @@ class Settings(BaseModel):
     @property
     def keywords_path(self) -> Path:
         return ROOT / self.keywords_file
+
+    @property
+    def company_path(self) -> Path:
+        return ROOT / self.company_file
 
 
 def load_settings(path: Path = DEFAULT_PATH) -> Settings:

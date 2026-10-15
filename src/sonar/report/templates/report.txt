@@ -7,6 +7,10 @@ Run {{ report.run_id }}  |  {{ report.started_at }}  |  matcher: {{ report.match
 {{ report.failed_sites|wrap("   ") }}
 
 {% endif %}
+{% if report.unscored %}
+!! {{ report.unscored }} {{ "posting" if report.unscored == 1 else "postings" }} could not be scored because the {{ report.matcher|upper }} matcher was unavailable. They are not non-matches; the next run tries again.
+
+{% endif %}
 {{ report.matches|length }} {{ "match" if report.matches|length == 1 else "matches" }}  |  {{ report.new_postings }} new postings found  |  {{ report.scored }} postings checked
 {{ "-" * width }}
 {% for m in report.matches %}
@@ -14,8 +18,13 @@ Run {{ report.run_id }}  |  {{ report.started_at }}  |  matcher: {{ report.match
 {{ loop.index }}. {{ m.title }}
    {{ m.site }}{% if m.account %} | {{ m.account }}{% endif %}{% if m.posted_date %} | posted {{ m.posted_date }}{% elif m.listed_date %} | listed {{ m.listed_date }}{% endif %}
 
+{% if m.score is not none %}
+   Jev score: {{ "%.2f"|format(m.score) }}{% if m.needs_review %}  ** NEEDS REVIEW, NOT CONFIDENT **{% endif %}
+
+{% else %}
    Keywords: {% for hit in m.hits %}{{ hit.keyword }}{% if hit.count > 1 %} (x{{ hit.count }}){% endif %}{{ ", " if not loop.last }}{% endfor %}
 
+{% endif %}
 {% if m.summary %}
 {{ m.summary|wrap("   ") }}
 
@@ -26,8 +35,12 @@ Run {{ report.run_id }}  |  {{ report.started_at }}  |  matcher: {{ report.match
    {{ m.url }}
 {% else %}
 
-No new postings matched your keywords in this run.
+No new postings matched{{ " your keywords" if report.matcher == "keywords" }} in this run.
 {% endfor %}
 
 {{ "-" * width }}
+{% if report.matcher == "keywords" %}
 {{ "Matches are ranked by how many different keywords they contain, then by total mentions. Text shared by nearly all postings on a site (banners, menus) is ignored. Each entry shows the first two keyword snippets."|wrap("") }}
+{% else %}
+{{ "Matches are ranked by Jev score (the probability that the posting is work the company would bid on). Text shared by nearly all postings on a site (banners, menus) is ignored."|wrap("") }}
+{% endif %}

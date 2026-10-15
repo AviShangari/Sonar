@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 DEFAULT_PATH = Path(__file__).resolve().parent.parent.parent / "config" / "sites.yaml"
 
@@ -24,6 +24,9 @@ class SiteConfig(BaseModel):
     login_url: str | None = None  # the page with the login form; needed when requires_login is true
     max_list_pages: int = 10  # safety cap on list steps (load more / next page) per run
     first_run_days: int = 3  # with an empty database, collect postings from this many days back
+    # Pause before each posting is opened (after the first), with +-30% random jitter, for sites that start refusing
+    # (403) a browser that opens pages faster than a person reads them. 0 = no pause.
+    open_delay_seconds: float = Field(default=0, ge=0, le=120)
     # True: every matched posting of this site carries the note 'please review the attached documents' in the email,
     # for sites whose documents cannot be seen without an account step (SAP Ariba prerequisites).
     attachment_note: bool = False

@@ -2,7 +2,7 @@
 
 from datetime import date, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
@@ -46,9 +46,12 @@ def site_posting_texts(engine: Engine, site: str) -> list[str]:
 
 
 def undecided_listings(engine: Engine, site: str, matcher: str) -> list[ListingRow]:
-    """A site's stored listings that this matcher has not decided yet."""
+    """A site's stored listings that this matcher has not decided yet. A listing it could not score
+    (`matched` is NULL, e.g. Jev was down) counts as undecided, so the next run tries it again."""
     with Session(engine, expire_on_commit=False) as session:
-        decided = select(DecisionRow.id).where(DecisionRow.listing_id == ListingRow.id, DecisionRow.matcher == matcher)
+        decided = select(DecisionRow.id).where(
+            DecisionRow.listing_id == ListingRow.id, DecisionRow.matcher == matcher, DecisionRow.matched.is_not(None)
+        )
         query = select(ListingRow).where(ListingRow.site == site, ~decided.exists()).order_by(ListingRow.id)
         return list(session.scalars(query))
 
@@ -108,7 +111,15 @@ def add_listing(engine: Engine, listing: Listing, run_id: int) -> int:
 
 
 def add_decision(engine: Engine, decision: Decision) -> int:
+    """Store a decision. An earlier unscored decision of the same matcher for the listing is replaced,
+    so a listing has one row per matcher."""
     with Session(engine) as session:
+        session.execute(
+            delete(DecisionRow).where(
+                DecisionRow.listing_id == decision.listing_id, DecisionRow.matcher == decision.matcher,
+                DecisionRow.matched.is_(None),
+            )
+        )
         row = DecisionRow(**decision.model_dump())
         session.add(row)
         session.commit()

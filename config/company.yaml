@@ -1,0 +1,19 @@
+# What the client does. Used by the Jev matcher (matcher: jev in settings.yaml) as the text of its one yes/no question.
+# It goes into the question's instructions and criteria, NOT into the posting data Jev reads.
+#
+# Fill in `what_we_do` before running with matcher: jev. Sonar refuses to start the Jev matcher while it is empty.
+# Write it as you would explain the company to a new colleague: the services it sells, the technologies and
+# kinds of buyers it works with, and what it does NOT do. Jev only knows what is written here.
+what_we_do: >-
+  Our experienced consultants provide tailored solutions across Management Consulting, Information Management, Enterprise Resource Planning (SAP, PeopleSoft, Microsoft Dynamics 365 CRM),  Business Intelligence, and Solutions Delivery. Whether you're modernizing operations, implementing enterprise systems, or leveraging data to make smarter decisions, ITnet delivers the expertise, reliability, and commitment you can count on. The company also provides staffing, recruitment and IT professional services.
+
+# The question Jev answers. `what_we_do` is placed in front of it.
+question: Is this posting a request for work the company described above would bid on?
+
+# What "yes" and "no" mean. Sharper wording here gives better probabilities; the 0.6 / 0.3 thresholds are in settings.yaml.
+yes_means: >-
+  The buyer is asking for services the company described above provides.
+no_means: >-
+  The buyer is asking for something the company does not provide, such as goods, construction, trades or
+  unrelated services. A posting that only names a procurement portal (for example SAP Ariba or SAP Business
+  Network) as the way to submit a bid is not about SAP work.

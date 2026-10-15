@@ -1,6 +1,6 @@
 import pytest
 
-from sonar.config import Settings, load_settings
+from sonar.config import load_settings
 from sonar.db import queries
 from sonar.db.tables import make_engine
 from sonar.main import run_status
@@ -80,11 +80,6 @@ def test_settings_load_and_pick_the_built_matcher() -> None:
     settings = load_settings()
     assert (settings.navigator, settings.matcher) == ("dom", "keywords")
     assert isinstance(build_matcher(settings), KeywordMatcher)
-
-
-def test_unbuilt_matcher_fails_clearly() -> None:
-    with pytest.raises(NotImplementedError, match="jev"):
-        build_matcher(Settings(matcher="jev"))
 
 
 def test_run_status_reflects_how_many_sites_failed() -> None:

@@ -14,12 +14,26 @@ class KeywordHit(BaseModel):
 
 
 class MatchResult(BaseModel):
-    """What a matcher says about one listing."""
+    """What a matcher says about one listing.
 
-    hits: list[KeywordHit]
+    The keyword matcher fills `hits`; "matched" then means at least one hit. Jev fills `score` (the probability
+    of "yes") and sets `verdict` itself, because it has no hits. `unscored` means the matcher could not decide
+    (Jev down): that is neither a match nor a non-match."""
+
+    hits: list[KeywordHit] = []
+    score: float | None = None  # Jev: probability that the posting is relevant, 0 to 1
+    verdict: bool | None = None  # set by matchers that decide without hits; None = decided by the hits
+    needs_review: bool = False  # a match the matcher is not confident about (Jev score between the two thresholds)
+    unscored: bool = False
+    error: str | None = None  # why it could not be scored (never holds a secret)
+    cost_usd: float | None = None  # what the matcher's service charged for this posting
 
     @property
-    def matched(self) -> bool:
+    def matched(self) -> bool | None:
+        if self.unscored:
+            return None
+        if self.verdict is not None:
+            return self.verdict
         return bool(self.hits)
 
 
@@ -78,7 +92,9 @@ class ReportMatch(BaseModel):
     department: str | None = None
     review_note: str | None = None  # set when the posting has (or probably has) documents the reader should open
     account: str | None = None  # which login found it (sites.yaml `account`), so a tester opens it with the right one
-    hits: list[KeywordHit]
+    score: float | None = None  # Jev probability; None for keyword matches
+    needs_review: bool = False  # Jev was not confident: shown in the same list, with a flag
+    hits: list[KeywordHit] = []
 
 
 class Report(BaseModel):
@@ -90,5 +106,6 @@ class Report(BaseModel):
     failed_sites: str | None = None  # the run's notes when sites failed
     new_postings: int  # stored during this run
     scored: int  # listings the matcher decided during this run
+    unscored: int = 0  # listings the matcher could not score this run (Jev down); they are retried next run
     matcher: str
     matches: list[ReportMatch]  # ranked, best first

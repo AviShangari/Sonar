@@ -34,7 +34,7 @@ uv tool install browser-use==0.13.11 --python 3.12   # one-time: the browser CLI
 ## Layout
 
 ```
-config/            settings.yaml (mode flags), sites.yaml (source registry), keywords.yaml
+config/            settings.yaml (mode flags), sites.yaml (source registry), keywords.yaml, company.yaml (Jev question text)
 src/sonar/
   main.py          entry point
   config.py        settings loading

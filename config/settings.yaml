@@ -4,9 +4,15 @@
 #   navigation_model / navigation_effort: model and reasoning effort of the browsing agent (auth: openrouter only)
 #   summary_model: model that writes the summaries (auth: openrouter only)
 #   navigator:     dom (built) or vision (not built yet)
-#   matcher:       keywords (built) or jev (not built yet)
+#   matcher:       keywords or jev. Jev needs OPENROUTER_API_KEY in .env (whatever `auth` is) and the text in company_file.
+#                  Switching to jev scores EVERY stored listing that has no Jev decision yet (a backfill), and retries any Jev could not score.
 #   database_url:  where listings and decisions are stored
 #   keywords_file: client keyword list used by the keywords matcher
+#   company_file:  what the client does: the text of Jev's one yes/no question (jev matcher only)
+#   jev_model:     pinned Jev version. Thresholds only mean something for one version; re-check the labeled set before changing it
+#   jev_match_threshold / jev_review_threshold: Jev's probability of "yes". At or above the first: a match. From the second up to the first:
+#                  a match flagged "needs review, not confident". Below the second: not a match
+#   jev_max_chars: the posting text sent to Jev is cut to this many characters
 #   timezone:      the business time zone (IANA name). Report times and "today" for the first-run window use it
 #   headless:      false shows the browser window. Headless mode sends a normal (non-"Headless") user agent, because CanadaBuys returns 403 to "HeadlessChrome".
 #   cdp_port:      remote-debugging port of the dedicated browser
@@ -33,6 +39,11 @@ navigator: dom
 matcher: keywords
 database_url: "sqlite:///data/sonar.db"
 keywords_file: config/keywords.yaml
+company_file: config/company.yaml
+jev_model: typesafe/jev-1.13
+jev_match_threshold: 0.6
+jev_review_threshold: 0.3
+jev_max_chars: 12000
 timezone: America/Toronto
 headless: false
 cdp_port: 9333

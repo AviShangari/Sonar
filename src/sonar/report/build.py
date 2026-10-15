@@ -16,9 +16,10 @@ from sonar.models import KeywordHit, Report, ReportMatch
 REVIEW_NOTE = "Please review the attached documents in the listing to verify that this listing is relevant."
 
 
-def _rank_key(match: ReportMatch) -> tuple[int, int]:
-    """More different keywords first, then more mentions in total."""
-    return (-len(match.hits), -sum(hit.count for hit in match.hits))
+def _rank_key(match: ReportMatch) -> tuple[int, int, float]:
+    """More different keywords first, then more mentions in total, then the higher Jev score
+    (so "needs review" matches sort below confident ones)."""
+    return (-len(match.hits), -sum(hit.count for hit in match.hits), -(match.score or 0.0))
 
 
 def closing_text(fields: dict) -> str | None:
@@ -66,9 +67,11 @@ def build_report(
         if run is None:
             raise ValueError(f"no run {run_id}")
         new_postings = session.scalar(select(func.count()).select_from(ListingRow).where(ListingRow.run_id == run_id))
-        scored = session.scalar(
-            select(func.count()).select_from(DecisionRow).where(DecisionRow.run_id == run_id, DecisionRow.matcher == matcher)
+        decisions_of_run = select(func.count()).select_from(DecisionRow).where(
+            DecisionRow.run_id == run_id, DecisionRow.matcher == matcher
         )
+        scored = session.scalar(decisions_of_run.where(DecisionRow.matched.is_not(None)))
+        unscored = session.scalar(decisions_of_run.where(DecisionRow.matched.is_(None)))
         status, started_at, notes = run.status, run.started_at, run.notes
 
     matches = [
@@ -87,6 +90,8 @@ def build_report(
             department=checked_text(listing.fields or {}, "department", "not found, please verify"),
             review_note=REVIEW_NOTE if listing.site in note_sites or has_document_links(listing.raw_html) else None,
             account=accounts.get(listing.site),
+            score=decision.score,
+            needs_review=bool(decision.details.get("needs_review")),
             hits=[KeywordHit(**hit) for hit in decision.details.get("hits", [])],
         )
         for listing, decision in matched_listings(engine, run_id)
@@ -101,6 +106,7 @@ def build_report(
         failed_sites=notes if status in ("partial", "failed") else None,
         new_postings=new_postings or 0,
         scored=scored or 0,
+        unscored=unscored or 0,
         matcher=matcher,
         matches=matches,
     )

@@ -37,7 +37,7 @@ class Settings(BaseModel):
     max_summaries: int | None = 40  # summaries written per run
     max_run_usd: float | None = None  # dollars per run, from the OpenRouter key's spend (auth: openrouter only)
     max_call_usd: float | None = None  # dollars per agent call, the SDK's own figure (see decision log before trusting it)
-    email: bool = False
+    email: bool = True  # on by default; never turn off without the developer's say-so (AGENTS.md "Email")
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_username: str = ""  # blank: log in with email_from

@@ -128,6 +128,10 @@ A scheduled run must use `openrouter` (enforce this when the scheduler is built)
 - When a step is done: tick it off in `plan.md`, update "Current status", and add any new decision to the decision log.
 - Keep `plan.md` current at all times: update it immediately whenever something changes (a PR merges, a decision is made, scope or priority shifts, a finding changes the design) and at the end of every phase. Do not leave it for later or for the end of the session.
 
+## Email
+
+`email` in `config/settings.yaml` (and its default in `config.py`) is `true`. Never set it to `false`, and never add a flag or code path that turns it off, without the developer's explicit say-so. For a test or a run you do not want emailed, use `scripts/send_report.py --dry-run`, or build `Settings(email=False)` inside a test only.
+
 ## Conventions
 
 - Type hints everywhere; Pydantic models for anything crossing a module boundary.

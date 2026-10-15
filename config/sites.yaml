@@ -10,6 +10,8 @@
 #   login_url:      the page with the login form; credentials come from .env (SONAR_<SITE>_USERNAME / _PASSWORD)
 #   max_list_pages: safety cap on list steps ("load more" / next page) per run (default 10)
 #   first_run_days: with an empty database, how many days back to collect (default 3)
+#   open_delay_seconds: pause before each posting is opened (after the first), +-30% random. For sites that return 403 to a browser that
+#                   opens pages faster than a person (default 0 = no pause)
 #   account:        label of the login this entry uses, shown beside its matches in the report. Two accounts on one site = two entries
 #   attachment_note: true adds 'please review the attached documents' to every matched posting of this site in the email
 #                   (for sites whose documents cannot be seen without an account step). Other sites get it when the posting links to document files
@@ -24,6 +26,7 @@ sites:
       3. 'Load more' is a LINK (not a button) named like 'LOAD 51 - 100 OF 20,325 RESULTS'. There is no 'next' link and no page numbers: do not search for them. Find the link in the accessibility tree by a name that starts with 'LOAD ', scroll it into view, click it, wait(5). The address does not change. The 50 new rows are added BELOW the old ones and the link's name moves on (next 'LOAD 101 - 150 ...').
       4. For a load-more step do the find, click and read in ONE browser call, then return only the rows after the ones already collected.
     requires_login: false
+    open_delay_seconds: 2  # CanadaBuys answered 403 after ~30 postings opened back to back
   - name: ontariotenders
     start_url: "https://ontariotenders.app.jaggaer.com/esop/nac-host/public/web/login.html"
     login_url: "https://ontariotenders.app.jaggaer.com/esop/nac-host/public/web/login.html"

@@ -332,3 +332,102 @@ def test_a_posting_that_will_not_open_is_screenshotted_then_closed(tmp_path) -> 
         assert len(list(tmp_path.glob("*-demo-open-ws1-*.png"))) == 1
 
     asyncio.run(scenario())
+
+
+def paced_navigator(delay: float, rows: list[str], seen: set[str] | None = None, context: FakeContext | None = None):
+    """A navigator for a site with `open_delay_seconds`; `sleeps` records each pause instead of waiting."""
+    sleeps: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+
+    async def collect(site: SiteConfig, offset: int) -> str:
+        return answer([row(job) for job in rows])
+
+    site = SITE.model_copy(update={"open_delay_seconds": delay})
+    nav = DomNavigator(
+        site, context or FakeContext(), collect, is_seen=lambda job_id: job_id in (seen or set()), cutoff=CUTOFF, sleep=fake_sleep  # type: ignore[arg-type]
+    )
+    return nav, sleeps
+
+
+def test_a_pause_comes_before_every_open_except_the_first() -> None:
+    async def scenario() -> None:
+        nav, sleeps = paced_navigator(10, ["a1", "b1", "c1"])
+        assert await drain(nav) == ["a1", "b1", "c1"]
+        assert len(sleeps) == 2
+        assert all(7 <= s <= 13 for s in sleeps)  # 10 seconds, +-30%
+
+    asyncio.run(scenario())
+
+
+def test_known_postings_cost_no_pause() -> None:
+    async def scenario() -> None:
+        nav, sleeps = paced_navigator(10, ["a1", "b1", "c1"], seen={"a1", "b1"})
+        assert await drain(nav) == ["c1"]
+        assert sleeps == []  # only one posting was really opened
+
+    asyncio.run(scenario())
+
+
+def test_no_delay_is_the_default() -> None:
+    async def scenario() -> None:
+        assert SITE.open_delay_seconds == 0
+        nav, sleeps = paced_navigator(0, ["a1", "b1"])
+        assert await drain(nav) == ["a1", "b1"]
+        assert sleeps == []
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("bad", [-1, 500])
+def test_the_delay_must_be_sensible(bad: float) -> None:
+    with pytest.raises(ValueError):
+        SiteConfig(name="x", start_url="https://x.example.com", allowed_hosts=["x.example.com"], open_delay_seconds=bad)
+
+
+def test_canadabuys_is_paced() -> None:
+    from sonar.sites import load_sites
+
+    assert {s.name: s.open_delay_seconds for s in load_sites()}["canadabuys"] > 0
+
+
+def test_a_posting_is_given_time_to_finish_loading_before_it_is_read() -> None:
+    states: list[tuple[str, int]] = []
+
+    class LoadingPage(FakePage):
+        async def wait_for_load_state(self, state: str, timeout: int) -> None:
+            assert not self.closed
+            states.append((state, timeout))
+
+    class LoadingContext(FakeContext):
+        async def new_page(self) -> FakePage:
+            page = LoadingPage()
+            self.opened.append(page)
+            return page
+
+    async def scenario() -> None:
+        nav, _ = make_navigator([answer([row("a1"), row("b1")])], context=LoadingContext())
+        assert await drain(nav) == ["a1", "b1"]
+        assert states == [("load", 15_000)] * 2
+
+    asyncio.run(scenario())
+
+
+def test_a_page_that_never_finishes_loading_is_still_read() -> None:
+    class SlowPage(FakePage):
+        async def wait_for_load_state(self, state: str, timeout: int) -> None:
+            raise TimeoutError("page never settled")
+
+    class SlowContext(FakeContext):
+        async def new_page(self) -> FakePage:
+            page = SlowPage()
+            self.opened.append(page)
+            return page
+
+    async def scenario() -> None:
+        nav, _ = make_navigator([answer([row("a1")])], context=SlowContext())
+        assert await drain(nav) == ["a1"]
+        assert nav.failed_opens == 0
+
+    asyncio.run(scenario())

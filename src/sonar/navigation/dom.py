@@ -17,8 +17,10 @@ The stop rule lives here, in code, not in the prompt:
   `max_list_pages`; the run then only counts as clean if the whole list was read.
 """
 
+import asyncio
 import json
 import logging
+import random
 import re
 from collections import Counter
 from collections.abc import Awaitable, Callable
@@ -44,6 +46,8 @@ DATE_RE = re.compile(r"(\d{4})[/-](\d{2})[/-](\d{2})")
 
 MAX_CLICK_FAILURES = 5  # postings that stay unreadable (HTTP 4xx) even after clicking their title: then stop and report
 TITLE_CHECK_CHARS = 40  # how much of a row's title must appear on the opened posting
+LOAD_WAIT_MS = 15_000  # how long an opened posting may take to finish loading its scripts and styles
+OPEN_DELAY_JITTER = 0.3  # the pause between postings varies by up to +-30%, so requests do not tick like a clock
 
 # A worked example for table-style lists, kept as real code so a test can check that the code
 # filter accepts it. Nodes come in page order, so the first date-like text after a link belongs
@@ -190,6 +194,15 @@ def _squash(text: str) -> str:
     return " ".join(text.split()).casefold()
 
 
+async def settle(page) -> None:
+    """Let a freshly opened posting finish loading, as a visitor would, before it is read and closed.
+    Best effort: a slow page or a page object without this method must not fail the posting."""
+    try:
+        await page.wait_for_load_state("load", timeout=LOAD_WAIT_MS)
+    except Exception as exc:
+        log.info("step=settle outcome=skipped error=%s", type(exc).__name__)
+
+
 async def shows_title(page, title: str) -> bool:
     """True if the opened page's text (or its tab title) contains the start of the row's title.
     Lists often cut long titles short ("...") so only the first TITLE_CHECK_CHARS characters count.
@@ -247,8 +260,11 @@ class DomNavigator:
         cutoff: date,
         shots: FailureShots | None = None,
         guard: GuardState | None = None,
+        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ) -> None:
         self.site = site
+        self._sleep = sleep  # replaced in tests so they do not really wait
+        self._opened_before = False  # the pause comes before every open except the first
         self.guard = guard or GuardState()
         self.context = context
         self.collect = collect
@@ -336,6 +352,7 @@ class DomNavigator:
                 self.skipped_seen += 1
                 log.info("site=%s job_id=%s step=dedup outcome=skipped", self.site.name, cand.job_id)
                 continue
+            await self._pace()
             if self.prefer_click or cand.click_only:
                 # An earlier posting showed that this site refuses typed addresses (click first, so we do not open
                 # a new tab and take a 403 for every posting), or this row has no address of its own.
@@ -363,6 +380,7 @@ class DomNavigator:
                 if not await shows_title(page, cand.title):
                     # The agent may have built this address; a page without the row's title is the wrong page.
                     raise RuntimeError(f"posting does not show its list title {cand.title[:60]!r}")
+                await settle(page)
             except Exception as exc:  # one bad posting must not stop the site
                 # Some sites refuse a posting's address typed into a new tab (403) but open it when its
                 # title is clicked in the list, as a visitor does. Try that before giving up.
@@ -399,6 +417,15 @@ class DomNavigator:
             return OpenedListing(job_id=cand.job_id, url=cand.url, page=page, listed_date=cand.listed_date, title=cand.title)
         return None
 
+    async def _pace(self) -> None:
+        """Wait before opening the next posting, if the site asks for it (`open_delay_seconds`)."""
+        delay = self.site.open_delay_seconds
+        if delay > 0 and self._opened_before:
+            wait = delay * random.uniform(1 - OPEN_DELAY_JITTER, 1 + OPEN_DELAY_JITTER)
+            log.info("site=%s step=pace outcome=waiting seconds=%.1f", self.site.name, wait)
+            await self._sleep(wait)
+        self._opened_before = True
+
     async def _known_after_open(self, opened: OpenedListing) -> bool:
         """For a posting opened by click: if the row gave no job ID, take it from the address the browser is
         on now (after a click that is the real posting address). Returns True, after closing it, when that
@@ -434,6 +461,7 @@ class DomNavigator:
                 async with page.expect_navigation(wait_until="domcontentloaded", timeout=30_000):
                     await matches[nth].click(timeout=15_000)
                 if await shows_title(page, cand.title):
+                    await settle(page)
                     log.info("site=%s job_id=%s step=open outcome=ok via=click", self.site.name, cand.job_id)
                     self.click_succeeded = True
                     return OpenedListing(

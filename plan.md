@@ -257,6 +257,7 @@ If time runs out:
 | 2026-10-14 | Each match names its account through a plain `account` label in `sites.yaml` (the login name is fine, never a password); the label is looked up at report time, so it applies to old listings and changing it needs no rebuild |
 | 2026-10-14 | Scope: the team lead needs a demo of the automation running in Docker, not the Azure deployment. VM, systemd timer and the scheduler are on hold; Step 4 (cost caps, spending limit) still applies to the demo |
 | 2026-10-11 | Priority: before scheduling or deploying, prove the agent on a second site, preferably one with a login (login by our code only, session expiry and 2FA handling as in Failure handling). CanadaBuys alone does not show the navigator is generic. Check each site's terms allow automated read-only access before building |
+| 2026-10-15 | `email` is now ON by default (`config.py` default and `settings.yaml` both `true`), replacing the 2026-10-11 "off by default". It is recorded in AGENTS.md ("Email") so no agent turns it off without the developer's say-so |
 | 2026-10-14 | Hints are hand-written recipes, not auto-saved from runs. An automatic "replay the last successful route" would put page-derived text into a prompt, which the 2026-10-13 rediscovery decision (and the route-note rule) rules out. A person reads the logged run, writes the steps, and reviews them; the agent is told to trust the page if a step fails |
 
 ## Notes for agents on this machine (Windows)

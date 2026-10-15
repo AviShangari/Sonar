@@ -17,14 +17,27 @@ sites:
   - name: canadabuys
     start_url: "https://canadabuys.canada.ca/en/tender-opportunities?status%5B0%5D=87&current_tab=t&record_per_page=50&order=pub_ifnot_amended&sort=desc"
     allowed_hosts: ["canadabuys.canada.ca"]
-    hint: "Search results of open tender opportunities; each result links to its own tender notice page."
+    hint: |-
+      Search results of open tender opportunities; each result links to its own tender notice page. Steps that worked on a past run:
+      1. new_tab(the start address), wait_for_load(), wait(3). The list is already open, newest first, 50 rows per page. No sorting needed.
+      2. Read the rows with the recipe, but keep only links whose address contains '/tender-notice/'. The 'LOAD ...' link also looks like a row (with a junk date, 2024-07-05): leave it out.
+      3. 'Load more' is a LINK (not a button) named like 'LOAD 51 - 100 OF 20,325 RESULTS'. There is no 'next' link and no page numbers: do not search for them. Find the link in the accessibility tree by a name that starts with 'LOAD ', scroll it into view, click it, wait(5). The address does not change. The 50 new rows are added BELOW the old ones and the link's name moves on (next 'LOAD 101 - 150 ...').
+      4. For a load-more step do the find, click and read in ONE browser call, then return only the rows after the ones already collected.
     requires_login: false
   - name: ontariotenders
     start_url: "https://ontariotenders.app.jaggaer.com/esop/nac-host/public/web/login.html"
     login_url: "https://ontariotenders.app.jaggaer.com/esop/nac-host/public/web/login.html"
     allowed_hosts:
       - host: ontariotenders.app.jaggaer.com
-        hint: "We are already logged in, on the Supplier Area dashboard. The list is the menu link 'Opportunities Open to All Suppliers' (also under Sourcing > Published Opportunities, tab Current Opportunities). Typed addresses give 403 here: reach everything by clicking, and return to the list by clicking that menu link again. Do not go back to the public login page; that leaves the logged-in area."
+        hint: |-
+          We are already logged in, on the Supplier Area dashboard. Typed addresses give 403 here: reach everything by clicking. Never go back to the public login page; that leaves the logged-in area. Steps that worked on a past run:
+          1. The very first browser call of a run can fail with a Python traceback. Just repeat it.
+          2. list_tabs(): use the tab titled 'Ontario Tenders Portal - Supplier Area' (the other is about:blank). switch_tab to it at the start of every call. Never open a new tab.
+          3. Open the list: in the accessibility tree two links are named 'Opportunities Open to All Suppliers'. Click the one whose name is in quote marks (it sits in the welcome text); clicking the plain menu entry did nothing. Scroll it into view first, then wait_for_load().
+          4. The list opens sorted OLDEST first (2022 dates on top). Click the column header link named 'Publication Date' ONCE: it is then newest first. Check that the first rows are dated today or yesterday.
+          5. All rows (about 56) are on one page; there is no load-more. Read them with the recipe.
+          6. Result links have no address of their own (href '#fh'). Each has an onclick like goToDetail('120431', '01000'); the first number is the posting number, and the posting's address is https://ontariotenders.app.jaggaer.com/esop/toolkit/opportunity/current/<number>/detail.si . Read the onclick with cdp("DOM.describeNode") and build the addresses from it. Do NOT click a posting to find this out: that takes you off the list.
+          7. If you did end up on a posting page, click its button 'Back To List' (it returns to the list; re-sort with step 4 if the order is oldest first again). Do not use the Sourcing menu: its entries are off screen and need extra clicks.
     requires_login: true
     read_post_paths: ["/esop/toolkit/opportunity/current/list-async.si"]  # the list's own sort/refresh request: a POST that only reads
   - &ariba  # anchor: the second account below reuses everything except its name and label
@@ -33,7 +46,14 @@ sites:
     start_url: "https://service.ariba.com/Sourcing.aw/109555011"
     login_url: "https://service.ariba.com/Sourcing.aw/109555011"
     allowed_hosts: ["service.ariba.com", "s1.ariba.com", "canada.supplier.ariba.com"]  # s1 holds the supplier iframe with the listings; canada.supplier is where the event links point
-    hint: "You are already logged in and are in the dashboard. The listings are in an 'Events' table inside an embedded frame, grouped by status; the simple link list of the page does not show it, so read the full DOM tree with pierce=True. The group 'Status: Open' is folded shut: click its small arrow (the triangle at the left of its label), wait a few seconds for the rows to load, then read the rows. Do not click the other groups."
+    hint: |-
+      You are already logged in and are in the dashboard. The listings are in an 'Events' table inside an embedded frame, grouped by status; the simple link list and the accessibility tree do not show it. Steps that worked on a past run:
+      1. The very first browser call of a run can fail with a Python traceback. Just repeat it.
+      2. list_tabs(): use the tab titled 'Ariba Sourcing' (the other is about:blank).
+      3. Read the full DOM tree: doc = cdp("DOM.getDocument", depth=-1, pierce=True), then walk it with a list that you extend with each node's children, contentDocument (the frame) and shadowRoots.
+      4. Find the table row (TR) that contains the text 'Status: Open' and is small (its text under about 3000 characters). The first A element inside it is the small arrow that folds the group open. Scroll it into view, click it, wait(5). Do not click the other groups.
+      5. Read the DOM again: the open events are now listed after the heading 'Events'. Each event title is an A element; print its attributes (cdp("DOM.describeNode", backendNodeId=ID, depth=-1, pierce=True)) to get the title text and the href, which is the event's address. Ariba lists have no dates: use null.
+      6. Typically only a handful of events are open, all on this one page. There is no load-more.
     requires_login: true
     attachment_note: true  # event documents sit behind 'Accept Prerequisites', which Sonar never does
     read_post_paths: ["/Sourcing.aw/109555011/ad/loginPage/SSOActions"]  # login hand-off form (encoded return addresses only); sends no user data

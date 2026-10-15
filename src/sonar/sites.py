@@ -70,7 +70,9 @@ class SiteConfig(BaseModel):
         if not lines:
             return ""
         return (
-            "\nHints from the operator (they may be out of date; if the page disagrees, trust the page):\n"
+            "\nHints from the operator. If a hint lists steps, they worked on a past run: follow them in order, "
+            "in as few tool calls as you can, instead of searching for the controls yourself. They may be out of date: "
+            "if a step fails or the page disagrees, trust the page and find the control yourself.\n"
             + "\n".join(lines)
         )
 

@@ -81,6 +81,15 @@ def test_hosts_can_carry_their_own_hints() -> None:
     assert "trust the page" in text  # hints can go stale
 
 
+def test_hints_tell_the_agent_to_follow_listed_steps_but_trust_the_page() -> None:
+    from sonar.sites import SiteConfig
+
+    site = SiteConfig(name="x", start_url="https://a.example.com/", allowed_hosts=["a.example.com"], hint="1. click A\n2. click B")
+    text = site.hints_text()
+    assert "1. click A\n2. click B" in text
+    assert "follow them in order" in text and "trust the page" in text
+
+
 def test_no_hints_means_no_hint_text() -> None:
     from sonar.sites import SiteConfig
 

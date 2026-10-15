@@ -9,9 +9,9 @@ These links are private claude.ai pages that coding agents cannot open. Everythi
 
 Refresh this block on every push (see the Workflow rule in `AGENTS.md`). Last updated 2026-10-15.
 
-- **`main`** is at PR #37 (email on by default, merged). Nothing else is waiting to merge.
-- **Active branch:** `docs/plan-sync-rule`, pushed, PR open, awaiting merge (the developer opens and merges it on GitHub): the "plan.md must say where we are" rule in `AGENTS.md`, this block, and the `dev` branch docs.
-- **Decided (2026-10-15), written into the docs on this branch:** a `dev` branch. `main` = stable, Docker-tested merges only; `dev` = where work is combined; feature branches start from `dev` (Branching section, decision log, `AGENTS.md` Workflow). **Not done yet:** create and push `dev` from `origin/main` after this branch merges, and set it as the GitHub default branch. Until `dev` exists, this branch targets `main`.
+- **`main`** is at PR #38 (the plan.md sync rule, this block and the `dev` branch docs; merged). PR #37 (email on by default) is merged too.
+- **`dev` branch exists** (created and pushed 2026-10-15 from `origin/main`). `main` = stable, Docker-tested merges only; `dev` = where work is combined; every feature branch starts from `dev` and merges back into it by pull request (Branching section, decision log, `AGENTS.md` Workflow). `dev` is also the GitHub default branch (set by the developer, 2026-10-15), so new pull requests target it.
+- **Active branch:** `docs/dev-branch-created` (from `dev`), pushed, PR open, awaiting merge into `dev`: this update.
 - **Next build step:** Jev matcher (`matching/jev.py`). Jev is reachable through OpenRouter (`POST https://openrouter.ai/api/alpha/decisions`, model `typesafe/jev-1.13`, same key as the navigation and summary models), so no separate TypeSafe account. Plan: yes/no and choice questions about the posting, with the client's "what we do" text in the question instructions (`config/company.yaml`, to write with the client). Needs the developer's go-ahead before any paid call.
 - **Small items waiting:** fix the stale Ariba-label test; real cost caps and an OpenRouter key spending limit before any scheduled run. Full list: see the build order and open questions below.
 

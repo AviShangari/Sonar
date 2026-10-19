@@ -93,10 +93,10 @@ The image is how Sonar will be deployed. It runs headless as a non-root user.
 
 ```bash
 docker build -t sonar .
-docker run --rm --shm-size=1g --env-file .env -v ./config:/app/config:ro -v ./data:/app/data sonar --site canadabuys --days 1
+docker run --rm --shm-size=1g --env-file .env -v ./config:/app/config:ro -v ./data:/app/data sonar
 ```
 
-Arguments after `sonar` are the same options as above. Use `auth: openrouter` in the mounted `config/settings.yaml`, because the container has no Claude login. Never publish the browser's debug port.
+This runs all the sites. You can add the same options as above after `sonar` (for example `--max-new 3` for a test). Use `auth: openrouter` in the mounted `config/settings.yaml`, because the container has no Claude login. Never publish the browser's debug port.
 
 ## Safety
 

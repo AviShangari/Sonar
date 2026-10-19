@@ -137,7 +137,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
     parser = argparse.ArgumentParser(description="Run the Sonar pipeline.")
     parser.add_argument("--site", action="append", help="only this site; repeat it for several (default: all)")
-    parser.add_argument("--days", type=int, help="first-run window in days, used only when nothing is stored yet")
+    parser.add_argument("--days", type=int, help="first-run window in days, used only when nothing is stored yet (default: 1, set per site by first_run_days)")
     parser.add_argument("--max-new", type=int, help="TEST CAP on new postings per site. Safe to use: a capped run does not move the stop point")
     args = parser.parse_args()
     sys.exit(asyncio.run(run(args.site, args.days, args.max_new)))

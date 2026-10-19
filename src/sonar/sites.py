@@ -23,7 +23,7 @@ class SiteConfig(BaseModel):
     read_post_paths: list[str] = []
     login_url: str | None = None  # the page with the login form; needed when requires_login is true
     max_list_pages: int = 10  # safety cap on list steps (load more / next page) per run
-    first_run_days: int = 3  # with an empty database, collect postings from this many days back
+    first_run_days: int = 1  # with an empty database, collect postings from this many days back
     # Pause before each posting is opened (after the first), with +-30% random jitter, for sites that start refusing
     # (403) a browser that opens pages faster than a person reads them. 0 = no pause.
     open_delay_seconds: float = Field(default=0, ge=0, le=120)

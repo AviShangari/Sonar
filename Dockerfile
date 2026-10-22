@@ -1,7 +1,7 @@
 # Sonar in a container.
 #   Build: docker build -t sonar .
 #   Run:   docker run --rm --shm-size=1g --env-file .env -v ./config:/app/config:ro -v ./data:/app/data sonar [--site NAME] [--days N] [--max-new N]
-#   (never publish the browser's debug port; with auth: openrouter the key comes from .env)
+#   (never publish the browser's debug port; the OpenRouter key comes from .env)
 #
 # Two Pythons: 3.11 runs Sonar; 3.12 runs the browser-use CLI (a separate tool, pinned, never a project dependency).
 # Chromium comes from Playwright. config/ and data/ are mounted at run time; .env is passed at run time.

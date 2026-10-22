@@ -2,7 +2,6 @@ import asyncio
 
 import pytest
 
-from sonar.agent_runner import isolated_options
 from sonar.db import queries
 from sonar.db.tables import make_engine
 from sonar.matching.keywords import KeywordMatcher
@@ -106,13 +105,6 @@ def test_summary_appears_in_html_and_text_reports(setup) -> None:
     report = build_report(engine, run_id, "keywords")
     assert "The buyer wants &lt;b&gt;SAP&lt;/b&gt; consulting." in render_html(report)  # escaped
     assert "The buyer wants <b>SAP</b> consulting." in render_text(report)
-
-
-def test_runtime_agents_load_nothing_from_disk_and_have_no_tools() -> None:
-    options = isolated_options("system", 2, "summary")
-    assert options.setting_sources == [] and options.tools == []
-    assert options.env == {"ENABLE_CLAUDEAI_MCP_SERVERS": "false"}
-    assert options.system_prompt == "system"
 
 
 def test_at_most_n_summaries_run_at_the_same_time() -> None:

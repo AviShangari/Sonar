@@ -17,8 +17,7 @@ SITE = SiteConfig(name="demo", start_url="https://bids.example.com/", allowed_ho
 
 @pytest.fixture()
 def wired(monkeypatch, tmp_path):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
+    monkeypatch.setattr(main.llm, "configure", lambda s: None)  # no OpenRouter key needed: no model is called
     engine = make_engine("sqlite://")
     settings = Settings(
         database_url="sqlite://", email=True, smtp_host="smtp.example", email_from="a@example.com",

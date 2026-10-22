@@ -76,7 +76,8 @@ def test_an_unknown_spend_never_blocks_the_run(monkeypatch) -> None:
     assert b.agent_calls == 1
 
 
-def test_the_usage_lookup_is_off_for_subscription_logins() -> None:
+def test_the_usage_lookup_is_off_until_llm_is_configured(monkeypatch) -> None:
+    monkeypatch.setattr(llm, "_configured", False)
     assert asyncio.run(llm.openrouter_usage_usd()) is None  # no network call, no key needed
 
 

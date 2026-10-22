@@ -8,10 +8,10 @@ A browser window opens. Default limit is 5 postings so a test run stays cheap.
 import argparse
 import asyncio
 import logging
-import os
-import sys
 from datetime import date, timedelta
 
+from sonar import llm
+from sonar.config import load_settings
 from sonar.db.queries import add_listing, fail_stale_runs, finish_run, listing_exists, newest_listed_date, start_run
 from sonar.db.tables import make_engine
 from sonar.extraction.posting import extract_listing
@@ -23,10 +23,8 @@ PORT = 9333
 
 
 async def main(name: str | None, limit: int, days: int | None) -> None:
-    for var in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"):
-        if os.environ.get(var):
-            sys.exit(f"{var} is set; unset it so the run uses your subscription login.")
-    sites = {s.name: s for s in load_sites()}
+    llm.configure(load_settings())  # the models come from config/settings.yaml; needs OPENROUTER_API_KEY
+    sites ={s.name: s for s in load_sites()}
     site = sites[name] if name else next(iter(sites.values()))
     engine = make_engine()
     if closed := fail_stale_runs(engine):

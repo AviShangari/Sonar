@@ -21,10 +21,10 @@ Then create a file named `.env` in the repo root. It is gitignored and is the on
 | Variable | Needed for |
 | --- | --- |
 | `SONAR_SMTP_PASSWORD` | Sending the email report (a Gmail app password for the default settings) |
-| `OPENROUTER_API_KEY` | `auth: openrouter` (scheduled runs), and the `jev` matcher |
+| `OPENROUTER_API_KEY` | Every model call: the browsing agent, the summaries and the `jev` matcher |
 | `SONAR_<SITE>_USERNAME` / `SONAR_<SITE>_PASSWORD` | Each site that needs a login. `<SITE>` is the site name in capitals: `SONAR_ONTARIOTENDERS_*`, `SONAR_ARIBA_*`, `SONAR_ARIBA2_*`. CanadaBuys needs none. |
 
-With the default `auth: subscription`, the agents use your own Claude login (log in to Claude Code once on the machine) and no API key is needed.
+There is no Claude-login mode: the agents always use the OpenRouter key, so the key is required for any run.
 
 ## Run it
 
@@ -44,13 +44,13 @@ Options:
 
 A cheap first test: `uv run python -m sonar.main --site canadabuys --days 1 --max-new 3`.
 
-A real run uses AI models and **costs money** when `auth: openrouter`. `max_run_usd` in `config/settings.yaml` stops a run at that dollar amount. Only one run can go at a time; a second one exits with code 2 and emails `[RUN SKIPPED]`.
+A real run uses AI models and **costs money** (it is billed to the OpenRouter key). `max_run_usd` in `config/settings.yaml` stops a run at that dollar amount. Only one run can go at a time; a second one exits with code 2 and emails `[RUN SKIPPED]`.
 
 ## Settings
 
 | File | What it holds |
 | --- | --- |
-| `config/settings.yaml` | Mode flags and limits: `auth`, `navigator`, `matcher` (`keywords` or `jev`), `headless`, cost caps, email addresses and mail server. Every setting is explained in the comments at the top of the file. |
+| `config/settings.yaml` | Mode flags, models and limits: `navigation_model`, `summary_model`, `navigator`, `matcher` (`keywords` or `jev`), `headless`, cost caps, email addresses and mail server. Every setting is explained in the comments at the top of the file. |
 | `config/sites.yaml` | The sites to scan: start address, whether a login is needed, allowed hosts. |
 | `config/keywords.yaml` | The client's keywords for the keyword matcher. |
 | `config/company.yaml` | What the client does; the text of Jev's yes/no question. |
@@ -73,9 +73,7 @@ Run any of them with `uv run python scripts/<name>.py`. They are for checking an
 | `show_clean_text.py [site] [job-id]` | Show the stored posting text after boilerplate is stripped. |
 | `check_login.py SITE` | Live check that our login works on a site. |
 | `check_site.py [site]` | Read-only check that a site's start page loads. |
-| `check_sdk.py` | Check the Agent SDK works on your Claude login with no project settings loaded. |
-| `check_openrouter.py` | Check the OpenRouter key and the two models (a few tiny paid calls). |
-| `check_cost.py` | Compare the cost the SDK reports with what OpenRouter charged (small paid calls). |
+| `check_openrouter.py` | Check the OpenRouter key, the two models and a tool call through our agent loop (a few tiny paid calls; prints each call's cost). |
 | `check_jev.py --dry-run` | Preview what the Jev matcher would send. Without `--dry-run` it makes paid calls. |
 | `run_dom_navigator.py [site] [--limit N]` | Run only the navigator on one site (stores postings, no matching). |
 
@@ -96,7 +94,7 @@ docker build -t sonar .
 docker run --rm --shm-size=1g --env-file .env -v ./config:/app/config:ro -v ./data:/app/data sonar
 ```
 
-This runs all the sites. You can add the same options as above after `sonar` (for example `--max-new 3` for a test). Use `auth: openrouter` in the mounted `config/settings.yaml`, because the container has no Claude login. Never publish the browser's debug port.
+This runs all the sites. You can add the same options as above after `sonar` (for example `--max-new 3` for a test). `--env-file .env` supplies `OPENROUTER_API_KEY`. Never publish the browser's debug port.
 
 ## Safety
 

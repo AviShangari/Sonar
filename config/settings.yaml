@@ -1,10 +1,9 @@
 # Mode flags and run settings. Read by src/sonar/config.py.
-#   auth:          subscription (your Claude login, for development) or openrouter (API key, for scheduled runs).
-#                  The key goes in the gitignored .env as OPENROUTER_API_KEY, never here (read only by secrets.py)
-#   navigation_model / navigation_effort: model and reasoning effort of the browsing agent (auth: openrouter only)
-#   summary_model: model that writes the summaries (auth: openrouter only)
+#   All model calls go to OpenRouter. The key goes in the gitignored .env as OPENROUTER_API_KEY, never here (read only by secrets.py)
+#   navigation_model / navigation_effort: model and reasoning effort of the browsing agent
+#   summary_model: model that writes the summaries
 #   navigator:     dom (built) or vision (not built yet)
-#   matcher:       keywords or jev. Jev needs OPENROUTER_API_KEY in .env (whatever `auth` is) and the text in company_file.
+#   matcher:       keywords or jev. Jev needs the text in company_file (it uses the same OPENROUTER_API_KEY).
 #                  Switching to jev scores EVERY stored listing that has no Jev decision yet (a backfill), and retries any Jev could not score.
 #   database_url:  where listings and decisions are stored
 #   keywords_file: client keyword list used by the keywords matcher
@@ -19,20 +18,19 @@
 #   report_dir:    where each run's report files (.html and .txt) are written
 #   screenshot_dir: where a screenshot is saved when navigation fails (inside data/, never committed)
 #   route_notes_dir: where the agent's note on how it reached each site's list is kept (one line per change; inside data/, never committed)
-#   summaries:     true: an agent writes a short summary for each match (needs the Claude login)
+#   summaries:     true: a model writes a short summary for each match
 #   summary_workers: how many summary agents run at the same time (each is a separate process)
 #   max_agent_calls / max_new_per_site / max_summaries: cost caps per run (all agent calls; new postings per site; summaries).
 #                  Hitting one ends the run as "partial", the email says which, and a cut-short site keeps its watermark. Blank = no limit
-#   max_run_usd:   dollar cap per run, read from the OpenRouter key's spend (auth: openrouter only). OpenRouter updates spend with a
+#   max_run_usd:   dollar cap per run, read from the OpenRouter key's spend. OpenRouter updates spend with a
 #                  delay of several seconds, so the run can overshoot by about one call. Blank = no limit
-#   max_call_usd:  the SDK's own dollar cap per agent call. Its figure is exact for Sonnet but about 2x too high for GPT-6.1 Sol, so it errs toward stopping early
+#   max_call_usd:  dollar cap per agent call, summed from the cost OpenRouter reports in each reply. Blank = no limit
 #   email:         ON BY DEFAULT. Do not set it to false without the developer's explicit say-so. true: send the report (HTML table plus a plain-text copy) by SMTP after each run. The password is NOT here:
 #                  put SONAR_SMTP_PASSWORD=... in the gitignored .env file (read only by secrets.py)
 #   smtp_host / smtp_port: the mail server (587 = STARTTLS, 465 = TLS)
 #   smtp_username: login name; blank means use email_from
 #   email_from / email_to: sender and the one recipient
-auth: subscription
-navigation_model: anthropic/claude-sonnet-5.5
+navigation_model: openai/gpt-6.1-sol
 navigation_effort: medium
 summary_model: anthropic/claude-sonnet-5.5
 navigator: dom

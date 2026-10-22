@@ -26,8 +26,8 @@ def smtp_password() -> str:
 
 
 def openrouter_api_key() -> str:
-    """The OpenRouter API key used when `auth: openrouter`."""
-    return _secret(OPENROUTER_KEY_VAR, "running with auth: openrouter")
+    """The OpenRouter API key every model call (agents and the Jev matcher) uses."""
+    return _secret(OPENROUTER_KEY_VAR, "running any model")
 
 
 def site_credentials(site_name: str) -> tuple[str, str]:

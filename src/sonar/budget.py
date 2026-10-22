@@ -33,7 +33,7 @@ class RunBudget:
     max_run_usd: float | None = None
     max_call_usd: float | None = None
     agent_calls: int = 0
-    sdk_cost_usd: float = 0.0  # the SDK's own figure, summed; only for comparing with OpenRouter's bill
+    reported_cost_usd: float = 0.0  # the cost OpenRouter reports in each reply, summed (exact; no counter delay)
     start_usage: float | None = None  # the key's lifetime spend when the run began
     exhausted: bool = False  # a run-wide limit was hit: no more agent calls
     hits: dict[str, str] = field(default_factory=dict)  # key -> sentence for the email (a key is noted once)
@@ -87,7 +87,7 @@ class RunBudget:
 
     def summary_line(self, spent: float | None) -> str:
         real = f"${spent:.4f}" if spent is not None else "unknown"
-        return f"cost: OpenRouter {real}, SDK-reported ${self.sdk_cost_usd:.4f}, {self.agent_calls} agent calls"
+        return f"cost: OpenRouter key {real}, reply-reported ${self.reported_cost_usd:.4f}, {self.agent_calls} agent calls"
 
     def notes(self) -> list[str]:
         return [f"COST LIMIT: {m}" for m in self.hits.values()]

@@ -7,7 +7,6 @@ Writes the run's report (.html and .txt) to the report folder, and emails it whe
 import argparse
 import asyncio
 import logging
-import os
 import sys
 
 from sqlalchemy.engine import Engine
@@ -35,10 +34,6 @@ def run_status(outcomes: list[SiteOutcome]) -> str:
 
 async def run(site_names: list[str] | None, days: int | None, max_new: int | None) -> int:
     settings = load_settings()
-    if settings.auth == "subscription":
-        for var in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"):
-            if os.environ.get(var):
-                sys.exit(f"{var} is set; unset it so the run uses your subscription login (or set auth: openrouter).")
     try:
         llm.configure(settings)  # fails before anything starts if the API key is missing
     except RuntimeError as exc:
@@ -79,7 +74,7 @@ async def run_locked(settings: Settings, sites: list[SiteConfig], days: int | No
         deliver(engine, run_id, settings)  # a crashed run must not look like a quiet day
         raise
     # Navigation and summaries run one after the other, so the spend at this boundary splits the bill by model.
-    nav_real, nav_sdk = await budget.current.final_spent_usd(), budget.current.sdk_cost_usd
+    nav_real, nav_reported = await budget.current.final_spent_usd(), budget.current.reported_cost_usd
     if settings.summaries:
         try:  # summaries are a bonus: a failure here must not fail the run
             print(f"summaries written: {await summarize_matches(engine, run_id, settings.matcher, workers=settings.summary_workers)}")
@@ -94,9 +89,9 @@ async def run_locked(settings: Settings, sites: list[SiteConfig], days: int | No
     print(budget.current.summary_line(total_real))
     if nav_real is not None and total_real is not None:
         print(
-            f"cost by model: navigation ({settings.navigation_model}) OpenRouter ${nav_real:.4f}, SDK ${nav_sdk:.4f}; "
-            f"summaries ({settings.summary_model}) OpenRouter ${max(0.0, total_real - nav_real):.4f}, "
-            f"SDK ${budget.current.sdk_cost_usd - nav_sdk:.4f}"
+            f"cost by model: navigation ({settings.navigation_model}) key ${nav_real:.4f}, reported ${nav_reported:.4f}; "
+            f"summaries ({settings.summary_model}) key ${max(0.0, total_real - nav_real):.4f}, "
+            f"reported ${budget.current.reported_cost_usd - nav_reported:.4f}"
         )
     finish_run(engine, run_id, status, notes)
     print_summary(run_id, status, outcomes)

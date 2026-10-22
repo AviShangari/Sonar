@@ -14,10 +14,9 @@ DEFAULT_PATH = ROOT / "config" / "settings.yaml"
 
 
 class Settings(BaseModel):
-    auth: Literal["subscription", "openrouter"] = "subscription"  # see llm.py
-    navigation_model: str = "openai/gpt-6.1-sol"  # used only with auth: openrouter
+    navigation_model: str = "openai/gpt-6.1-sol"  # the browsing agent's model (OpenRouter name; see llm.py)
     navigation_effort: Literal["low", "medium", "high", "xhigh", "max"] | None = "medium"
-    summary_model: str = "anthropic/claude-sonnet-5.5"  # used only with auth: openrouter
+    summary_model: str = "anthropic/claude-sonnet-5.5"  # the summary writer's model
     navigator: Literal["dom", "vision"] = "dom"
     matcher: Literal["keywords", "jev"] = "keywords"
     database_url: str = "sqlite:///data/sonar.db"
@@ -40,8 +39,8 @@ class Settings(BaseModel):
     max_agent_calls: int | None = 80  # all agent calls in a run: list-page reads plus summaries
     max_new_per_site: int | None = 100  # new postings stored per site
     max_summaries: int | None = 40  # summaries written per run
-    max_run_usd: float | None = None  # dollars per run, from the OpenRouter key's spend (auth: openrouter only)
-    max_call_usd: float | None = None  # dollars per agent call, the SDK's own figure (see decision log before trusting it)
+    max_run_usd: float | None = None  # dollars per run, from the OpenRouter key's spend
+    max_call_usd: float | None = None  # dollars per agent call, summed from the cost OpenRouter reports in each reply
     email: bool = True  # on by default; never turn off without the developer's say-so (AGENTS.md "Email")
     smtp_host: str = ""
     smtp_port: int = 587

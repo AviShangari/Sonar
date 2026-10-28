@@ -346,3 +346,11 @@ def test_a_row_without_a_job_id_in_its_address_is_logged_with_that_address(cfg, 
     with caplog.at_level("WARNING", logger="sonar.hermes"):
         asyncio.run(HermesCollector(cfg, 9333, FakeContext(), server_factory=FakeServer)(SITE_WITH_LIST, 0))  # type: ignore[arg-type]
     assert "no_job_id" in caplog.text and "https://bids.example.com/en/notices" in caplog.text
+
+
+def test_the_task_asks_for_the_title_alone_and_merx_has_a_pause() -> None:
+    from sonar.sites import load_sites
+
+    assert "title only, without its category, buyer, location or dates" in first_task(SITE, learn=False)
+    assert "title only, without its category, buyer, location or dates" in next_task(25)
+    assert {s.name: s.open_delay_seconds for s in load_sites()}["merx"] == 1.5

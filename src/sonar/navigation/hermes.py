@@ -34,7 +34,8 @@ DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 ROW_FORMAT = (
     "Output format (important): when your program extracts the list rows, make it print them in exactly this shape and "
-    "print nothing else in that call: one line BEGIN_ROWS, then one line per row  ROW|title|address|date  (address = the "
+    "print nothing else in that call: one line BEGIN_ROWS, then one line per row  ROW|title|address|date  (title = the "
+    "opportunity's own title only, without its category, buyer, location or dates; address = the "
     "row's full https address; date = its PUBLICATION date as YYYY-MM-DD, or null if the page shows none, never the closing "
     "date; replace any | inside a title with /), then one line END_ROWS. Rows in page order, no other fields. "
     'When a complete block has been printed, your final answer must be ONLY this JSON object and nothing else: '

@@ -3,7 +3,7 @@
 import re
 from urllib.parse import parse_qs, urlencode, urljoin, urlparse
 
-ID_PARAMS = ("id", "itemid", "noticeid", "tenderid", "jobid", "opportunityid", "bidid", "rfpid")
+ID_PARAMS = ("id", "itemid", "noticeid", "tenderid", "jobid", "opportunityid", "bidid", "rfpid", "rfqid")
 
 
 def normalize_url(url: str, base: str | None = None) -> str:

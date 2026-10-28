@@ -345,7 +345,12 @@ class DomNavigator:
 
     async def next_listing(self) -> OpenedListing | None:
         if self._queue is None:
-            await self._collect()
+            try:
+                await self._collect()
+            finally:
+                # A collector that holds resources (the Hermes server) is released as soon as the list is read.
+                if close := getattr(self.collect, "aclose", None):
+                    await close()
         while self._queue:
             cand = self._queue.pop(0)
             if cand.job_id and self.is_seen(cand.job_id):  # dedup before any work

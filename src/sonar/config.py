@@ -17,8 +17,8 @@ class Settings(BaseModel):
     navigation_model: str = "openai/gpt-6.1-sol"  # the browsing agent's model (OpenRouter name; see llm.py)
     navigation_effort: Literal["low", "medium", "high", "xhigh", "max"] | None = "medium"
     summary_model: str = "anthropic/claude-sonnet-5.5"  # the summary writer's model
-    navigator: Literal["dom", "vision"] = "dom"
-    matcher: Literal["keywords", "jev"] = "keywords"
+    navigator: Literal["dom", "vision", "hermes"] = "hermes"
+    matcher: Literal["keywords", "jev"] = "jev"
     database_url: str = "sqlite:///data/sonar.db"
     keywords_file: str = "config/keywords.yaml"
     company_file: str = "config/company.yaml"  # what the client does: the Jev question text (matcher: jev only)
@@ -94,6 +94,40 @@ class Settings(BaseModel):
     @property
     def company_path(self) -> Path:
         return ROOT / self.company_file
+
+
+HERMES_PATH = ROOT / "config" / "hermes.yaml"
+
+
+class HermesSettings(BaseModel):
+    """How Sonar runs the Hermes Agent (config/hermes.yaml). Used only when `navigator: hermes`."""
+
+    home: str  # Hermes's own folder: config, saved notes (skills), memory, logs. Keep the path SHORT (a long one breaks a Windows DLL)
+    install_dir: str = "%LOCALAPPDATA%/hermes/hermes-agent"  # where `install.ps1` put Hermes's code
+    executable: str = "%LOCALAPPDATA%/hermes/bin/hermes.exe"
+    model: str = "openai/gpt-6.1-sol"  # pinned: the server otherwise picks its own default; any other model answering stops the run
+    provider: str = "openrouter"
+    api_port: int = 8642  # the local-only server Sonar talks to
+    max_turns: int = 50  # model calls Hermes may make for one task
+    task_seconds: int = 480  # one task (a whole list page, or a "load more" step)
+    snapshot_threshold: int = 90000
+    learn: bool = True  # Hermes may save and update its own notes (skills); the guard allows create and patch only
+
+    @property
+    def home_path(self) -> Path:
+        return Path(os.path.expandvars(self.home))
+
+    @property
+    def install_path(self) -> Path:
+        return Path(os.path.expandvars(self.install_dir))
+
+    @property
+    def executable_path(self) -> Path:
+        return Path(os.path.expandvars(self.executable))
+
+
+def load_hermes_settings(path: Path = HERMES_PATH) -> HermesSettings:
+    return HermesSettings(**yaml.safe_load(path.read_text(encoding="utf-8")))
 
 
 def load_settings(path: Path = DEFAULT_PATH) -> Settings:

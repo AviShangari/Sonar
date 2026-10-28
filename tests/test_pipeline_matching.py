@@ -78,8 +78,8 @@ def test_only_the_named_site_is_matched(engine) -> None:
 
 def test_settings_load_and_pick_the_built_matcher() -> None:
     settings = load_settings()
-    assert (settings.navigator, settings.matcher) == ("dom", "keywords")
-    assert isinstance(build_matcher(settings), KeywordMatcher)
+    assert (settings.navigator, settings.matcher) == ("hermes", "jev")
+    assert isinstance(build_matcher(settings.model_copy(update={"matcher": "keywords"})), KeywordMatcher)
 
 
 def test_run_status_reflects_how_many_sites_failed() -> None:

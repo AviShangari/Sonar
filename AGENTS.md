@@ -16,6 +16,7 @@ See `plan.md` for the build order, current status and decision log.
 - **OpenRouter chat-completions API** (plain `httpx` calls, our own small tool loop in `agent_runner.py`) for the navigation agent (GPT-6.1 Sol) and the summary writer (Claude Sonnet 5.5). No agent framework or Agent SDK
 - **Playwright** (Chromium) launches and guards a dedicated browser, and our code reads URLs and posting text from it
 - **Browser Use CLI** (`browser-use==0.13.11`, installed as a separate `uv tool` with Python 3.12, NOT a project dependency) lets the DOM-stream agent click and navigate by attaching to that browser over CDP (`BU_CDP_URL`)
+- **Hermes Agent** (v0.22.4, installed separately by its own installer, NOT a project dependency) is an optional list reader: `navigator: hermes` in `settings.yaml`. Only `hermes_runner.py` starts or stops it; settings in `config/hermes.yaml`. See "Hermes navigator" below
 - **Keyword matcher** (Python `re`) for demo 1; **Jev** (TypeSafe AI, REST via `httpx`) for demo 2
 - **Pydantic** for schemas and settings, **SQLAlchemy + SQLite** for storage
 - **Jinja2** for the email report
@@ -34,7 +35,7 @@ uv tool install browser-use==0.13.11 --python 3.12   # one-time: the browser CLI
 ## Layout
 
 ```
-config/            settings.yaml (mode flags), sites.yaml (source registry), keywords.yaml, company.yaml (Jev question text)
+config/            settings.yaml (mode flags), hermes.yaml (Hermes runner), sites.yaml (source registry), keywords.yaml, company.yaml (Jev question text)
 src/sonar/
   main.py          entry point
   config.py        settings loading
@@ -44,7 +45,9 @@ src/sonar/
   db/              tables and queries
   budget.py        cost caps for one run (counts and dollars)
   agent_runner.py  the ONLY place agents (the model loop) and the browser-use CLI are run
-  navigation/      base.py (interface), dom.py, vision.py, tools.py (browser(code) tool), code_check.py (validates agent code), guards.py (browser request guards), session.py
+  hermes_runner.py the ONLY place the Hermes server is started and stopped (preflight, whitelisted environment, cost)
+hermes_plugins/    sonar_guard: the Hermes guard plugin (copied into Hermes's home each run)
+  navigation/      base.py (interface), dom.py, hermes.py (Hermes collector for dom.py), vision.py, tools.py (browser(code) tool), code_check.py (validates agent code), guards.py (browser request guards), session.py
   extraction/      posting text extraction
   matching/        base.py (interface), keywords.py, jev.py
   summarize/       summaries for matches
@@ -86,6 +89,15 @@ Create folders and files as the build reaches them. Do not scaffold empty placeh
 - Normalize URLs (strip query strings and fragments, resolve relative links) before keying.
 - Collection is newest first and stops in code, not in the prompt: at the first list row dated before the cutoff (the site's watermark, which only a clean run moves forward, else `first_run_days` back), capped by `max_list_pages`. The agent reads rows and clicks "load more" one step at a time when code asks.
 - Workers open new links in the logged-in session, max 2 to 3 concurrent per site.
+
+## Hermes navigator
+
+- `navigator: hermes` reuses `DomNavigator` with a different collector (`navigation/hermes.py`): the stop rule, dedup, opening postings and extraction are the same code. Only the reading of list pages is done by Hermes. The DOM stream stays the fallback.
+- Our pipeline is in charge and Hermes is a worker: one local-only Hermes server per site, started and stopped by `hermes_runner.py`, one conversation per site (first message reads the list, follow-ups page it, sent by our code only while the cutoff is not reached).
+- Hermes prints rows between `BEGIN_ROWS` and `END_ROWS`; the guard plugin keeps that block in a file and our code checks every line (https, allowed host, plain date, no duplicate). Rows never pass through the model's answer.
+- The guard plugin lives in `hermes_plugins/sonar_guard/` and is copied into Hermes's home at the start of every run. It allows only `browser_exec` (code checked by `navigation/code_check.py`) and, in learn mode, note tools (`skill_manage` create/patch only). Hermes lets everything through if a plugin fails to load, so `hermes_runner.py` runs a preflight (the guard must block the probe calls) and refuses to start otherwise. Never add a setting that skips it.
+- Hermes gets a WHITELISTED environment (`child_env()`); site and SMTP passwords never reach it. It still needs the OpenRouter key, so use a key with its own spending limit before any scheduled run.
+- Hermes keeps its own notes (skills) in its home folder (`config/hermes.yaml` `home`). That folder is persistent; do not delete it. Notes come from page content, so a person reads them now and then.
 
 ## Keyword matching rules
 

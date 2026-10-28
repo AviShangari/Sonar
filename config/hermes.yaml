@@ -1,0 +1,22 @@
+# How Sonar runs the Hermes Agent. Read by src/sonar/config.py; used only when settings.yaml has `navigator: hermes`.
+# No secrets here: the OpenRouter key comes from .env through secrets.py and llm.py.
+#   home:               Hermes's own folder (its config, saved notes = skills, memory, logs). Keep the path SHORT:
+#                       a long one breaks a Windows DLL. Sonar rewrites <home>/config.yaml and copies the guard plugin
+#                       into <home>/plugins at the start of every run. The saved notes live here, so keep this folder.
+#   install_dir/executable: where Hermes's installer put its code and program (environment variables are expanded)
+#   model / provider:   pinned. If any other model answers, the run is stopped
+#   api_port:           the local-only server port Sonar talks to
+#   max_turns:          model calls Hermes may make for one task
+#   task_seconds:       time limit for one task (reading a list page, or one "load more" step)
+#   snapshot_threshold: Hermes's page-outline size limit, raised so a long list is not cut
+#   learn:              true lets Hermes save and update its own notes about each site (create and patch only, never delete)
+home: C:/hh
+install_dir: "%LOCALAPPDATA%/hermes/hermes-agent"
+executable: "%LOCALAPPDATA%/hermes/bin/hermes.exe"
+model: openai/gpt-6.1-sol
+provider: openrouter
+api_port: 8642
+max_turns: 50
+task_seconds: 480
+snapshot_threshold: 90000
+learn: true

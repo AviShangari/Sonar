@@ -2,7 +2,7 @@
 #   All model calls go to OpenRouter. The key goes in the gitignored .env as OPENROUTER_API_KEY, never here (read only by secrets.py)
 #   navigation_model / navigation_effort: model and reasoning effort of the browsing agent
 #   summary_model: model that writes the summaries
-#   navigator:     dom (built) or vision (not built yet)
+#   navigator:     hermes (Hermes Agent reads the list pages; see config/hermes.yaml), dom (the older in-house agent, fallback) or vision (not built yet)
 #   matcher:       keywords or jev. Jev needs the text in company_file (it uses the same OPENROUTER_API_KEY).
 #                  Switching to jev scores EVERY stored listing that has no Jev decision yet (a backfill), and retries any Jev could not score.
 #   database_url:  where listings and decisions are stored
@@ -33,8 +33,8 @@
 navigation_model: openai/gpt-6.1-sol
 navigation_effort: medium
 summary_model: anthropic/claude-sonnet-5.5
-navigator: dom
-matcher: keywords
+navigator: hermes
+matcher: jev
 database_url: "sqlite:///data/sonar.db"
 keywords_file: config/keywords.yaml
 company_file: config/company.yaml

@@ -1,0 +1,7 @@
+name: sonar_guard
+version: "1.0.0"
+description: "Allow only browser_exec (code checked by Sonar's code_check) and, in learn mode, create/patch of notes; block everything else and block on its own errors. Observer: captures a printed row block."
+author: "Sonar"
+provides_hooks:
+  - pre_tool_call
+  - post_tool_call

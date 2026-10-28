@@ -25,6 +25,7 @@ Role = Literal["navigation", "summary"]
 
 CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_KEY_URL = "https://openrouter.ai/api/v1/key"  # read-only: how much this key has spent
+GENERATION_URL = "https://openrouter.ai/api/v1/generation"  # read-only: what one model call cost
 TIMEOUT_S = 120  # one model reply
 RETRIES = 2  # extra tries after a timeout, a 429 or a 5xx
 RETRY_PAUSE_S = 2.0  # multiplied by the try number
@@ -133,6 +134,29 @@ async def chat(
         return parse_reply(response.json())
     except ValueError as exc:
         raise LLMError("the model's reply was not JSON") from exc
+
+
+def key_for_hermes() -> str:
+    """The OpenRouter key handed to the Hermes server process. Hermes makes its own model calls, so it
+    needs the key; this is the only place the key leaves for another process."""
+    return openrouter_api_key()
+
+
+async def generation_cost_usd(generation_id: str, tries: int = 10, pause_s: float = 2.0) -> float | None:
+    """Exact cost of one model call, from OpenRouter's per-call record (the key's own counter lags and
+    under-reports). The record can take a few seconds to appear, so retry. None when it never shows up."""
+    headers = {"Authorization": f"Bearer {openrouter_api_key()}"}
+    async with httpx.AsyncClient(timeout=15) as client:
+        for attempt in range(tries):
+            try:
+                reply = await client.get(GENERATION_URL, params={"id": generation_id}, headers=headers)
+                if reply.status_code == 200:
+                    return float(reply.json()["data"].get("total_cost") or 0)
+            except Exception as exc:  # noqa: BLE001  (httpx errors carry the URL, not the headers)
+                log.warning("step=cost outcome=generation_lookup_failed error=%s", type(exc).__name__)
+            if attempt < tries - 1:
+                await asyncio.sleep(pause_s)
+    return None
 
 
 async def openrouter_usage_usd() -> float | None:

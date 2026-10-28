@@ -63,3 +63,7 @@ sites:
   - <<: *ariba  # second Ariba login: own browser profile, watermark and credentials (SONAR_ARIBA2_USERNAME / _PASSWORD in .env)
     name: ariba2
     account: "rfp@itnet.ca"
+  - name: merx  # public list, no login. No hints on purpose: Hermes works the site out itself. Terms of use accepted by the developer (2026-10-28)
+    start_url: "https://www.merx.com/public/solicitations/open"
+    allowed_hosts: ["www.merx.com"]
+    open_delay_seconds: 1.5  # the first run, with no pause, got HTTP 403 after about 120 postings opened back to back

@@ -15,10 +15,8 @@ SMTP_TIMEOUT_SECONDS = 30
 def build_message(report: Report, settings: Settings) -> EmailMessage:
     count = len(report.matches)
     subject = f"Sonar: {count} {'match' if count == 1 else 'matches'} (run {report.run_id})"
-    if report.status == "partial":
-        subject = "[PARTIAL RUN] " + subject
-    elif report.status != "ok":
-        subject = "[RUN FAILED] " + subject
+    if report.status == "failed" and not count:  # a partial run reads like any other; a failed one with nothing says so
+        subject = f"Sonar: today's run failed (run {report.run_id})"
     message = EmailMessage()
     message["Subject"] = subject
     message["From"] = settings.email_from

@@ -1,5 +1,6 @@
 """Builds the report for one run from the database. Plain code: no agent writes the report."""
 
+import re
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
@@ -11,6 +12,7 @@ from sonar.db.queries import matched_listings
 from sonar.extraction.documents import has_document_links
 from sonar.db.tables import DecisionRow, ListingRow, RunRow
 from sonar.models import KeywordHit, Report, ReportMatch
+from sonar.report.render import portal_name
 
 
 REVIEW_NOTE = "Please review the attached documents in the listing to verify that this listing is relevant."
@@ -20,6 +22,21 @@ def _rank_key(match: ReportMatch) -> tuple[int, int, float]:
     """More different keywords first, then more mentions in total, then the higher Jev score
     (so "needs review" matches sort below confident ones)."""
     return (-len(match.hits), -sum(hit.count for hit in match.hits), -(match.score or 0.0))
+
+
+SITE_PREFIX = re.compile(r"^([a-z][a-z0-9_-]*): ")
+
+
+def failed_portals(notes: str | None) -> list[str]:
+    """Readable portal names from a run's notes ("canadabuys: OpenFailures: ...; ariba: ..."), each once, in order.
+    Cost-limit notes carry no site prefix, so they name no portal."""
+    names: list[str] = []
+    for part in (notes or "").split("; "):
+        if found := SITE_PREFIX.match(part):
+            name = portal_name(found.group(1))
+            if name not in names:
+                names.append(name)
+    return names
 
 
 def closing_text(fields: dict) -> str | None:
@@ -104,6 +121,7 @@ def build_report(
         status=status,
         started_at=_long_date_time(started_at.replace(tzinfo=timezone.utc).astimezone(tz or timezone.utc)),
         failed_sites=notes if status in ("partial", "failed") else None,
+        failed_portals=failed_portals(notes) if status in ("partial", "failed") else [],
         new_postings=new_postings or 0,
         scored=scored or 0,
         unscored=unscored or 0,

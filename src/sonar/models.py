@@ -103,7 +103,8 @@ class Report(BaseModel):
     run_id: int
     status: str  # "ok", "partial" or "failed"
     started_at: str
-    failed_sites: str | None = None  # the run's notes when sites failed
+    failed_sites: str | None = None  # the run's notes when sites failed (for the developer: not shown in the email)
+    failed_portals: list[str] = []  # readable names of the portals that could not be checked, for the email's short note
     new_postings: int  # stored during this run
     scored: int  # listings the matcher decided during this run
     unscored: int = 0  # listings the matcher could not score this run (Jev down); they are retried next run

@@ -1,17 +1,24 @@
 SONAR: {{ report.matches|length }} {{ "match" if report.matches|length == 1 else "matches" }} (run {{ report.run_id }}, {{ report.started_at }})
 {{ report.new_postings }} new postings found | {{ report.scored }} checked
-{% if report.failed_sites %}
+{% if report.status == "failed" %}
 
-!! {{ "THIS RUN WAS INCOMPLETE" if report.status == "partial" else "THIS RUN FAILED" }}
-{{ report.failed_sites|wrap("") }}
+!! Today's run failed. No portal could be checked. Please try again later.
+{% elif partial_note(report) %}
+
+Note: {{ partial_note(report) }}
 {% endif %}
 {% if report.unscored %}
 
 !! {{ report.unscored }} {{ "posting" if report.unscored == 1 else "postings" }} could not be scored because the {{ report.matcher|upper }} matcher was unavailable. {{ "It is" if report.unscored == 1 else "They are" }} not treated as non-matches and will be tried again in the next run.
 {% endif %}
-{% for m in report.matches %}
+{% set count = namespace(n=0) %}
+{% for portal, items in report.matches|by_portal %}
 
-{{ loop.index }}. {{ m.title }}
+== {{ portal|upper }} ({{ items|length }} {{ "match" if items|length == 1 else "matches" }}) ==
+{% for m in items %}
+{% set count.n = count.n + 1 %}
+
+{{ count.n }}. {{ m.title }}
 {% if m.needs_review %}** Needs review, not confident **
 {% endif %}
 Link: {{ m.url }}
@@ -24,7 +31,9 @@ Due date: {{ m.closing_date or "not available" }}
 {% endif %}Description:
 {{ (m.summary or "Summary not available")|wrap("    ") }}
 {% if m.review_note %}Note: {{ m.review_note }}
-{% endif %}{% else %}
+{% endif %}
+{% endfor %}
+{% else %}
 
 No new postings matched{{ " your keywords" if report.matcher == "keywords" }} in this run.
 {% endfor %}

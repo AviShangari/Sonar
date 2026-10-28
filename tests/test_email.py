@@ -1,3 +1,5 @@
+from html import unescape
+
 import pytest
 
 from sonar.config import Settings
@@ -7,9 +9,10 @@ from sonar.report import send
 from sonar.report.render import render_email_html, render_email_text
 
 
-def make_report(status: str = "ok", failed: str | None = None, matches: list[ReportMatch] | None = None) -> Report:
+def make_report(status: str = "ok", failed: str | None = None, matches: list[ReportMatch] | None = None,
+                portals: list[str] | None = None) -> Report:
     return Report(run_id=3, status=status, started_at="October 11, 2026, 09:00 EDT", failed_sites=failed,
-                  new_postings=5, scored=5, matcher="keywords", matches=matches or [])
+                  failed_portals=portals or [], new_postings=5, scored=5, matcher="keywords", matches=matches or [])
 
 
 def make_match(summary: str | None = "A short summary.", **extra) -> ReportMatch:
@@ -33,13 +36,26 @@ def full_match(**extra) -> ReportMatch:
     return make_match(**{**fields, **extra})
 
 
-def test_html_email_is_a_table_with_the_seven_columns_in_order() -> None:
-    html = render_email_html(make_report(matches=[full_match()]))
-    headings = ["Date posted", "Supply arrangement", "Title", "Solicitation number", "Description", "Issuing department", "Due date"]
+def test_html_email_is_one_compact_table_per_portal_with_one_row_per_match() -> None:
+    html = render_email_html(make_report(matches=[full_match(), full_match(title="Second", job_id="b")]))
+    headings = ["Date posted", "Title", "Solicitation number", "Supply arrangement", "Issuing department", "Due date"]
     assert [html.index(f">{h}<") for h in headings] == sorted(html.index(f">{h}<") for h in headings)
     for value in ("2026-03-11", "TBIPS", "SAP support", "WS123-45", "Provide SAP support.", "Health Canada", "2026-12-31"):
         assert value in html
-    assert html.count("<tr") == 2  # header row + one match
+    assert html.count('class="row') == 2 and html.count("<th") == 6  # one header, two rows
+
+
+def test_matches_are_grouped_by_portal_biggest_first_and_two_logins_share_one_portal() -> None:
+    matches = [make_match(title="A1", site="canadabuys"), make_match(title="B1", site="ariba"),
+               make_match(title="B2", site="ariba2"), make_match(title="A2", site="canadabuys"),
+               make_match(title="C1", site="ariba")]
+    report = make_report(matches=matches)
+    html, text = render_email_html(report), render_email_text(report)
+    for body in (html, text):
+        assert body.lower().index("sap ariba") < body.lower().index("canadabuys")
+    assert html.index(">B1<") < html.index(">C1<") < html.index(">A1<")  # Ariba has 3, CanadaBuys 2
+    assert "3 matches" in html and "2 matches" in html
+    assert [line[:2] for line in text.splitlines() if line[:2] in ("1.", "2.", "3.", "4.", "5.")] == ["1.", "2.", "3.", "4.", "5."]
 
 
 def test_title_is_a_link_and_keywords_and_snippets_are_gone() -> None:
@@ -79,10 +95,29 @@ def test_the_sent_message_has_a_text_part_and_an_html_table(monkeypatch) -> None
     assert "<table" in message.get_body(("html",)).get_content()
 
 
-def test_email_is_produced_with_zero_matches_and_lists_failed_sites() -> None:
-    report = make_report(status="partial", failed="siteA: boom")
+def test_email_is_produced_with_zero_matches() -> None:
+    report = make_report()
     for body in (render_email_text(report), render_email_html(report)):
-        assert "No new postings matched" in body and "siteA: boom" in body
+        assert "No new postings matched" in body
+
+
+def test_a_partial_run_gets_one_calm_line_naming_the_portal_and_no_technical_error() -> None:
+    report = make_report(status="partial", failed="canadabuys: OpenFailures: 5 postings could not be opened", portals=["CanadaBuys"])
+    for body in (render_email_text(report), unescape(render_email_html(report))):
+        assert "We couldn't check CanadaBuys today" in body and "try again later" in body
+        assert "OpenFailures" not in body and "RUN FAILED" not in body and "incomplete" in body
+    both = make_report(status="partial", portals=["CanadaBuys", "Ontario Tenders", "SAP Ariba"])
+    assert "CanadaBuys, Ontario Tenders and SAP Ariba" in render_email_html(both)
+    stopped = make_report(status="partial", failed="COST LIMIT: limit reached")  # no failed site: a cost limit cut it short
+    assert "stopped early" in render_email_html(stopped) and "COST LIMIT" not in render_email_html(stopped)
+
+
+def test_a_run_where_everything_failed_gets_the_banner_and_a_partial_run_does_not() -> None:
+    failed = make_report(status="failed", failed="canadabuys: boom", portals=["CanadaBuys"])
+    for body in (render_email_text(failed), unescape(render_email_html(failed))):
+        assert "Today's run failed" in body and "boom" not in body
+    for status in ("ok", "partial"):
+        assert "run failed" not in render_email_html(make_report(status=status))
 
 
 def test_send_uses_starttls_login_and_message(monkeypatch) -> None:
@@ -112,10 +147,12 @@ def test_send_needs_password_and_addresses(monkeypatch, tmp_path) -> None:
         send.send_report(make_report(), Settings(email=True))
 
 
-def test_subject_flags_a_bad_run() -> None:
-    assert send.build_message(make_report(status="failed"), settings())["Subject"].startswith("[RUN FAILED]")
-    assert send.build_message(make_report(status="partial"), settings())["Subject"].startswith("[PARTIAL RUN]")
-    assert send.build_message(make_report(), settings())["Subject"] == "Sonar: 0 matches (run 3)"
+def test_subject_is_plain_unless_the_run_failed_with_nothing_to_show() -> None:
+    subject = lambda report: send.build_message(report, settings())["Subject"]
+    assert subject(make_report(status="failed")) == "Sonar: today's run failed (run 3)"
+    assert subject(make_report(status="partial")) == "Sonar: 0 matches (run 3)"  # no alarm prefix for the other team
+    assert subject(make_report(status="failed", matches=[make_match()])) == "Sonar: 1 match (run 3)"
+    assert subject(make_report()) == "Sonar: 0 matches (run 3)"
 
 
 def test_password_is_read_from_env_file(monkeypatch, tmp_path) -> None:
@@ -131,3 +168,11 @@ def test_email_shows_the_due_date_flag_and_leaves_out_how_to_apply() -> None:
     report = make_report(matches=[full_match(closing_date="2026-12-31 (unsure, please verify)", how_to_apply="Submit through the portal.")])
     for body in (render_email_text(report), render_email_html(report)):
         assert "2026-12-31 (unsure, please verify)" in body and "Submit through the portal." not in body
+
+
+def test_a_very_long_email_stays_under_gmails_clipping_limit_by_shortening_summaries() -> None:
+    long_summary = "The department seeks a vendor for ERP support and project management. " * 12
+    report = make_report(matches=[full_match(title=f"Posting {i}", job_id=str(i), summary=long_summary) for i in range(60)])
+    html = render_email_html(report)
+    assert len(html.encode()) < 102_000 and long_summary not in html
+    assert long_summary in render_email_html(make_report(matches=[full_match(summary=long_summary)]))  # short emails are untouched

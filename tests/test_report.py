@@ -169,3 +169,11 @@ def test_each_match_names_the_account_that_found_it() -> None:
     assert render_email_text(report).count("Account:") == 2  # none for the site without an account
     plain = build_report(engine, run_id, "keywords")  # no accounts configured: no column, no label
     assert "Account" not in render_email_html(plain) and "Account:" not in render_email_text(plain)
+
+
+def test_failed_portals_are_read_from_the_run_notes_once_each_and_cost_limits_name_none() -> None:
+    from sonar.report.build import failed_portals
+
+    notes = "canadabuys: OpenFailures: 5 postings could not be opened; ariba2: boom; ariba: boom; COST LIMIT: limit of 80 reached"
+    assert failed_portals(notes) == ["CanadaBuys", "SAP Ariba"]
+    assert failed_portals("COST LIMIT: limit of 80 reached") == [] and failed_portals(None) == []

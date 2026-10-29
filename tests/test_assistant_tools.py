@@ -1,4 +1,4 @@
-"""The assistant's six tools over a small real SQLite file. No network, no model calls."""
+"""The assistant's tools over a small real SQLite file. No network, no model calls."""
 
 import asyncio
 import json
@@ -66,8 +66,11 @@ def payload(result: str) -> dict:
     return json.loads(result.removeprefix(OPEN_TAG + "\n").removesuffix("\n" + CLOSE_TAG))
 
 
-def test_there_are_exactly_six_tools(db_url) -> None:
-    assert TOOL_NAMES == ["list_recent_matches", "search_matches", "get_posting", "explain_match", "read_posting_text", "last_run_status"]
+def test_there_are_exactly_these_tools(db_url) -> None:
+    assert TOOL_NAMES == [
+        "list_recent_matches", "search_matches", "get_posting", "explain_match", "read_posting_text", "last_run_status",
+        "pdf_options", "make_pdf",
+    ]
     assert set(make_tools(db_url).handlers) == set(TOOL_NAMES)
 
 

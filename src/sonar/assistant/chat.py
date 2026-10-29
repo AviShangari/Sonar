@@ -135,7 +135,7 @@ def repl(assistant: Assistant, read: Callable[[str], str] = input, write: Callab
             continue
         try:
             with thinking(status):
-                answer = asyncio.run(assistant.ask(line))
+                answer = asyncio.run(assistant.ask_full(line))
         except AgentError as exc:
             write(f"\nSorry, I couldn't answer that: {for_terminal(str(exc))}")
             continue
@@ -144,7 +144,9 @@ def repl(assistant: Assistant, read: Callable[[str], str] = input, write: Callab
             session_cost()
             return
         questions += 1
-        write(f"\nSonar:\n{format_answer(answer, terminal_width())}")
+        write(f"\nSonar:\n{format_answer(answer.text, terminal_width())}")
+        for path in answer.files:
+            write(f"\nPDF saved: {path}")
 
 
 def main() -> int:

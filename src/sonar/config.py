@@ -34,6 +34,7 @@ class Settings(BaseModel):
     lock_dir: str = "data"  # holds the run lock file
     screenshot_dir: str = "data/screenshots"  # failure screenshots (gitignored, for people only)
     route_notes_dir: str = "data/route-notes"  # how the agent reached each site's list (gitignored, for people only)
+    pdf_dir: str = "data/pdfs"  # the PDFs made on request (gitignored)
     summaries: bool = True
     summary_workers: int = 4
     # Cost caps per run (see budget.py). Hitting one ends the run as "partial". None = no limit.
@@ -89,6 +90,10 @@ class Settings(BaseModel):
         return ROOT / self.route_notes_dir
 
     @property
+    def pdf_path(self) -> Path:
+        return ROOT / self.pdf_dir
+
+    @property
     def keywords_path(self) -> Path:
         return ROOT / self.keywords_file
 
@@ -129,6 +134,35 @@ class HermesSettings(BaseModel):
 
 def load_hermes_settings(path: Path = HERMES_PATH) -> HermesSettings:
     return HermesSettings(**yaml.safe_load(path.read_text(encoding="utf-8")))
+
+
+TEAMS_PATH = ROOT / "config" / "teams.yaml"
+
+
+class TeamsSettings(BaseModel):
+    """The Teams bot (config/teams.yaml). Its passwords are in .env, read by secrets.py."""
+
+    host: str = "127.0.0.1"  # local only: the Dev Tunnel reaches it there. A server or container sets 0.0.0.0
+    port: int = 3978
+    allowed_users: list[str] = []  # Entra object IDs of the people who may ask; empty = anyone in the company
+    max_conversations: int = 200  # conversations whose history is kept in memory; the oldest is dropped first
+    app_name: str = "Sonar"
+    short_description: str
+    full_description: str
+    developer_name: str
+    website_url: str
+    privacy_url: str
+    terms_url: str
+    app_version: str = "1.0.0"  # raise it whenever a new app package is uploaded to Teams
+    package_dir: str = "data/teams"  # where the app package (zip) is written
+
+    @property
+    def package_path(self) -> Path:
+        return ROOT / self.package_dir
+
+
+def load_teams_settings(path: Path = TEAMS_PATH) -> TeamsSettings:
+    return TeamsSettings(**yaml.safe_load(path.read_text(encoding="utf-8")))
 
 
 def load_settings(path: Path = DEFAULT_PATH) -> Settings:

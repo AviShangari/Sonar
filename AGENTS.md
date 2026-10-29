@@ -20,6 +20,7 @@ See `plan.md` for the build order, current status and decision log.
 - **Keyword matcher** (Python `re`) for demo 1; **Jev** (TypeSafe AI, REST via `httpx`) for demo 2
 - **Pydantic** for schemas and settings, **SQLAlchemy + SQLite** for storage
 - **Jinja2** for the email report
+- **Microsoft Teams SDK** (`microsoft-teams-apps==2.1.1`, pinned) receives Teams messages for the Teams bot (`teams/`). It only carries messages and checks their signatures; the answers come from our own assistant loop, never the SDK's AI features. Locally Teams reaches the bot through a **Dev Tunnel** (`devtunnel`, installed with winget, NOT a project dependency)
 - **pytest** for tests, **Docker** for packaging; deployment target is an Azure VM (not yet confirmed)
 
 ## Commands
@@ -35,7 +36,7 @@ uv tool install browser-use==0.13.11 --python 3.12   # one-time: the browser CLI
 ## Layout
 
 ```
-config/            settings.yaml (mode flags), hermes.yaml (Hermes runner), sites.yaml (source registry), keywords.yaml, company.yaml (Jev question text)
+config/            settings.yaml (mode flags), hermes.yaml (Hermes runner), teams.yaml (Teams bot), pdf.yaml (PDF presets), sites.yaml (source registry), keywords.yaml, company.yaml (Jev question text)
 src/sonar/
   main.py          entry point
   config.py        settings loading
@@ -46,7 +47,9 @@ src/sonar/
   budget.py        cost caps for one run (counts and dollars)
   agent_runner.py  the ONLY place agents (the model loop) and the browser-use CLI are run
   hermes_runner.py the ONLY place the Hermes server is started and stopped (preflight, whitelisted environment, cost)
-  assistant/       terminal Q&A over stored reports (`python -m sonar.assistant`): six read-only tools (one reads stored posting text in chunks), read-only database, no browser/shell/send/scan; tool results are wrapped as untrusted data (safe.py)
+  assistant/       terminal Q&A over stored reports (`python -m sonar.assistant`): six read-only tools (one reads stored posting text in chunks) plus `pdf_options` and `make_pdf`, read-only database, no browser/shell/send/scan; tool results are wrapped as untrusted data (safe.py)
+  pdf/             PDF reports on request (`python -m sonar.pdf.make`): spec.py (validated options + presets from config/pdf.yaml), css.py, data.py, render.py (templates/run_pdf.html, then a locked-down headless Chromium), make.py
+  teams/           the same assistant in Microsoft Teams (`python -m sonar.teams`): bot.py (who it answers, one question at a time per chat), delivery.py (offering a PDF as a file), package.py (the app zip to upload in Teams)
 hermes_plugins/    sonar_guard: the Hermes guard plugin (copied into Hermes's home each run)
   navigation/      base.py (interface), dom.py, hermes.py (Hermes collector for dom.py), vision.py, tools.py (browser(code) tool), code_check.py (validates agent code), guards.py (browser request guards), session.py
   extraction/      posting text extraction
@@ -120,7 +123,22 @@ Create folders and files as the build reaches them. Do not scaffold empty placeh
 
 ## Agent context
 
-Runtime agents are plain OpenRouter requests, so nothing from the repo, `CLAUDE.md`, skills or `~/.claude/` can reach them. Keep it that way: a request holds only our system prompt, the task, and (browsing agent only) the one `browser` tool. Keep tests that check this (`tests/test_llm.py`, `tests/test_agent_loop.py`). One exception, by the developer's decision (2026-10-29): the terminal assistant (`assistant/`) also gets six read-only database tools, one of which, `read_posting_text`, returns stored posting text in chunks. Its tool results are cleaned and wrapped as untrusted data, it has no browser, shell, send, scan or login tool, and `tests/test_assistant_safety.py` checks all of this. Do not widen its tools without asking.
+Runtime agents are plain OpenRouter requests, so nothing from the repo, `CLAUDE.md`, skills or `~/.claude/` can reach them. Keep it that way: a request holds only our system prompt, the task, and (browsing agent only) the one `browser` tool. Keep tests that check this (`tests/test_llm.py`, `tests/test_agent_loop.py`). One exception, by the developer's decision (2026-10-29): the terminal assistant (`assistant/`) also gets six read-only database tools, one of which, `read_posting_text`, returns stored posting text in chunks. Its tool results are cleaned and wrapped as untrusted data, it has no browser, shell, send, scan or login tool, and `tests/test_assistant_safety.py` checks all of this. Do not widen its tools without asking. The Teams bot (`teams/`) runs this same assistant with the same tools; only the answer layout line of its prompt differs.
+
+## PDF reports
+
+- `make_pdf` (the assistant's second extra tool, with `pdf_options`; the developer asked for it 2026-10-29) writes ONE file into `data/pdfs/` and nothing else. The file name is built by `pdf/make.py`; no option, preset or posting text can choose a path.
+- A person changes a PDF only through `PdfSpec` (validated, unknown options are errors) and `custom_css` (`pdf/css.py`: no `url()`, `@import`, scripts, HTML or escapes). The model never writes the Jinja template or HTML; `templates/run_pdf.html` is ours and is edited by a developer in a pull request. Presets live in `config/pdf.yaml` and are validated at load.
+- The page is printed by a throwaway headless Chromium with JavaScript off and every network request aborted (`pdf/render.py`), so nothing can be fetched or sent even if the styling check missed something. `tests/test_pdf.py` proves it with a local server that must see no request. Never loosen this.
+- Everything from postings is escaped by Jinja; only http(s) links are emitted.
+- Files reach people through `assistant/outbox.py` (per question, at most 3), never through the model: the terminal prints the path, Teams offers a file consent card (`teams/delivery.py`, one-to-one chats only, bound to the person, the chat and 30 minutes). Channels and group chats cannot receive bot files without SharePoint and admin-approved Graph permissions; do not add those without asking.
+
+## Teams bot
+
+- The SDK checks that every request is signed by Microsoft for our App ID. `build_app` passes `dangerously_allow_unauthenticated_requests=False` explicitly so the SDK's environment variable cannot turn that off. Never add a setting or flag that skips it.
+- On top of that, `bot.py` ignores other companies (tenant check), answers only `allowed_users` when the list is set, and in channels and group chats only when @mentioned. Keep tests for each (`tests/test_teams.py`).
+- Answers run in the background (Teams waits only about 15 seconds), one question at a time per conversation. Errors reach Teams only as a short apology; details go to the log. Question text is never logged.
+- The bot listens on `127.0.0.1` locally; only a server or container sets `host: 0.0.0.0`. The app package holds the App ID and is written under `data/`, never committed.
 
 ## Auth and models
 

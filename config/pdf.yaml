@@ -1,0 +1,37 @@
+# PDF presets: named starting points for the PDFs the assistant makes on request. Read by src/sonar/pdf/spec.py.
+#   A person can still change anything on top of a preset ("the brief, but landscape and only CanadaBuys").
+#   `spec` holds any of the options below; leave out what the default is right for. A wrong option stops the
+#   assistant at start-up with the preset's name, so typos do not surprise anyone later.
+#
+#   sections:         overview, matches, near_misses (the order here is the order on the page)
+#   layout:           cards (every match in full) or table (one compact row each)
+#   sites:            only these portals (for example [canadabuys]); empty = all
+#   keyword:          only matches whose keywords, title or summary contain this text
+#   sort:             rank (the report's own order), closing, site or title
+#   max_matches (1-300) / max_near_misses (0-100): how many of each
+#   show_summaries / show_keyword_hits: the summary text and the keyword snippets on each card
+#   orientation:      portrait or landscape      page_size: Letter or A4      font_size_pt: 8 to 14
+#   accent_color:     headings and chips, as #RRGGBB
+#   custom_css:       extra styling (no url(), @import or scripts); the base template is src/sonar/pdf/templates/run_pdf.html
+presets:
+  standard:
+    description: The default look. Overview with per-portal counts, every match as a card, and the closest rejections.
+    spec: {}
+  brief:
+    description: Short. The overview and a compact table of the best matches, without near misses.
+    spec:
+      sections: [overview, matches]
+      layout: table
+      max_matches: 40
+  full:
+    description: Everything. Overview, up to 300 matches as cards, and the 50 closest rejections.
+    spec:
+      max_matches: 300
+      max_near_misses: 50
+  closing-soon:
+    description: Matches in a landscape table, soonest closing date first.
+    spec:
+      sections: [matches]
+      layout: table
+      sort: closing
+      orientation: landscape

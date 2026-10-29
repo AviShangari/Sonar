@@ -1,0 +1,26 @@
+# The Teams bot. Read by src/sonar/config.py (TeamsSettings).
+#   Start it with:  uv run python -m sonar.teams    (needs TEAMS_APP_ID, TEAMS_APP_PASSWORD, TEAMS_TENANT_ID in .env)
+#   Build the app package to upload in Teams:  uv run python -m sonar.teams.package
+#
+#   host / port:      where the bot listens. 127.0.0.1 = this computer only; the Dev Tunnel forwards Teams to it
+#   allowed_users:    Entra object IDs of the people who may ask Sonar questions. Empty = anyone in the company.
+#                     Someone who is not on the list gets a short "not allowed" reply, and their ID is printed in the bot's log
+#   max_conversations: chats whose recent questions are remembered (in memory only; a restart forgets them)
+#   app_*, *_description, developer_name, *_url: what Teams shows about the app. Teams requires the three https links;
+#                     they are placeholders until the company gives real ones (Teams does not open them for an internal app)
+#   app_version:      raise it each time a changed package is uploaded, or Teams keeps the old one
+host: 127.0.0.1
+port: 3978
+allowed_users: []
+max_conversations: 200
+app_name: Sonar
+short_description: Ask about new tender matches found by Sonar.
+full_description: >-
+  Sonar scans project-bidding websites for new tenders and decides which ones match ITnet's areas of interest.
+  Ask it about recent matches, closing dates, why a posting matched, or the last scan, or ask for a PDF report. It can only read Sonar's stored reports.
+developer_name: ITnet
+website_url: https://example.com
+privacy_url: https://example.com/privacy
+terms_url: https://example.com/terms
+app_version: 1.1.0
+package_dir: data/teams

@@ -1,0 +1,167 @@
+<!doctype html>
+{# The base PDF template. Rendered by sonar/pdf/render.py with `data` (PdfData) and `spec` (PdfSpec). Everything from a
+   posting is escaped by Jinja; links are only emitted for http(s) addresses. Keep this file free of scripts, fonts and
+   images from the web: the PDF is made in a browser that refuses every request. #}
+{% set report = data.report %}
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{ spec.title or ("Sonar report, run " ~ report.run_id) }}</title>
+<style>
+  :root { --accent: {{ spec.accent_color }}; --ink: #1f2933; --muted: #62707d; --line: #d9dee3; --soft: #f4f6f8; }
+  * { box-sizing: border-box; }
+  body { margin: 0; color: var(--ink); font: {{ spec.font_size_pt }}pt/1.45 "Segoe UI", Arial, Helvetica, sans-serif; }
+  h1 { font-size: 2em; margin: 0 0 2pt; color: var(--accent); }
+  h2 { font-size: 1.35em; margin: 20pt 0 8pt; padding-bottom: 3pt; border-bottom: 2pt solid var(--accent); break-after: avoid; }
+  h3 { font-size: 1.1em; margin: 0 0 2pt; }
+  a { color: var(--accent); text-decoration: none; }
+  .sub { color: var(--muted); margin: 0 0 12pt; }
+  .stats { display: flex; gap: 8pt; margin: 0 0 12pt; }
+  .stat { flex: 1; border: 1pt solid var(--line); border-radius: 5pt; padding: 8pt 10pt; background: var(--soft); }
+  .stat b { display: block; font-size: 1.9em; line-height: 1.1; color: var(--accent); }
+  .stat span { color: var(--muted); font-size: 0.85em; }
+  .alert { border: 1pt solid #f0b4ac; background: #fdecea; color: #8a1c10; border-radius: 5pt; padding: 7pt 10pt; margin: 0 0 8pt; }
+  .note { border: 1pt solid var(--line); background: var(--soft); color: var(--muted); border-radius: 5pt; padding: 7pt 10pt; margin: 0 0 8pt; }
+  table { width: 100%; border-collapse: collapse; margin: 0 0 8pt; }
+  thead { display: table-header-group; }
+  th { text-align: left; background: var(--soft); color: var(--muted); font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.03em; }
+  th, td { padding: 4pt 6pt; border-bottom: 1pt solid var(--line); vertical-align: top; }
+  tr { break-inside: avoid; }
+  td.num, th.num { text-align: right; white-space: nowrap; }
+  td.nowrap { white-space: nowrap; }
+  .card { border: 1pt solid var(--line); border-radius: 5pt; padding: 9pt 11pt; margin: 0 0 8pt; break-inside: avoid; }
+  .meta { color: var(--muted); font-size: 0.85em; margin: 0 0 5pt; }
+  .chips { margin: 0 0 5pt; }
+  .chip { display: inline-block; background: var(--soft); border: 1pt solid var(--line); color: var(--accent); border-radius: 9pt; padding: 0 7pt; margin: 0 3pt 3pt 0; font-size: 0.85em; font-weight: 600; }
+  .facts { display: flex; flex-wrap: wrap; gap: 2pt 14pt; margin: 0 0 5pt; font-size: 0.9em; }
+  .facts span { color: var(--muted); }
+  .summary { margin: 0 0 4pt; }
+  .snip { margin: 3pt 0 0; padding-left: 7pt; border-left: 2pt solid var(--line); color: #3e4c59; font-size: 0.88em; }
+  .review { margin: 5pt 0 0; color: #8a5a00; font-size: 0.88em; }
+  mark { background: #fff1b8; color: inherit; }
+  .empty { border: 1pt dashed var(--line); border-radius: 5pt; padding: 12pt; text-align: center; color: var(--muted); }
+</style>
+{% if spec.custom_css %}
+<style>
+{{ spec.custom_css|safe }}
+</style>
+{% endif %}
+</head>
+<body>
+<h1>{{ spec.title or "Sonar report" }}</h1>
+<p class="sub">{% if spec.subtitle %}{{ spec.subtitle }} &middot; {% endif %}Run {{ report.run_id }} &middot; {{ report.started_at }} &middot; matcher: {{ report.matcher }} &middot; prepared {{ data.generated_at }}</p>
+
+{% for section in spec.sections %}
+{% if section == "overview" %}
+<h2>Overview</h2>
+{% if report.status == "failed" %}
+<div class="alert"><b>This run failed.</b> The numbers below may be incomplete.</div>
+{% elif partial_note(report) %}
+<div class="alert">{{ partial_note(report) }}</div>
+{% endif %}
+{% if report.unscored %}
+<div class="alert"><b>{{ report.unscored }} {{ "posting" if report.unscored == 1 else "postings" }} could not be scored.</b> The {{ report.matcher|upper }} matcher was unavailable; they are not rejections and the next run tries again.</div>
+{% endif %}
+<div class="stats">
+  <div class="stat"><b>{{ data.matches_in_run }}</b><span>{{ "match" if data.matches_in_run == 1 else "matches" }}</span></div>
+  <div class="stat"><b>{{ report.new_postings }}</b><span>new postings found</span></div>
+  <div class="stat"><b>{{ report.scored }}</b><span>postings checked</span></div>
+  <div class="stat"><b>{{ data.rejected_total }}</b><span>rejected</span></div>
+</div>
+{% if data.site_counts %}
+<table>
+  <thead><tr><th>Portal</th><th class="num">New postings</th><th class="num">Matched</th><th class="num">Needs review</th><th class="num">Rejected</th><th class="num">Not scored</th></tr></thead>
+  <tbody>
+{% for c in data.site_counts %}
+    <tr><td>{{ c.portal }}{% if c.site != c.portal|lower %} <span class="meta">({{ c.site }})</span>{% endif %}</td><td class="num">{{ c.new_postings }}</td><td class="num">{{ c.matched }}</td><td class="num">{{ c.needs_review }}</td><td class="num">{{ c.rejected }}</td><td class="num">{{ c.unscored }}</td></tr>
+{% endfor %}
+  </tbody>
+</table>
+{% endif %}
+<p class="meta">"Matched" is what the matcher accepted; "needs review" are matches it was not confident about. "Rejected" postings were checked and did not match. Postings first seen in earlier runs may be scored in this one, so the columns need not add up.</p>
+
+{% elif section == "matches" %}
+<h2>Matches</h2>
+{% if spec.sites or spec.keyword or spec.sort != "rank" %}
+<p class="note">Showing {% if spec.sites %}portals: {{ spec.sites|join(", ") }}{% else %}all portals{% endif %}{% if spec.keyword %}; containing "{{ spec.keyword }}"{% endif %}; {% if spec.sort == "rank" %}best matches first{% elif spec.sort == "closing" %}soonest closing date first{% elif spec.sort == "site" %}grouped by portal{% else %}by title{% endif %}.</p>
+{% endif %}
+{% if data.matches_after_filter > report.matches|length %}
+<p class="note">Showing the first {{ report.matches|length }} of {{ data.matches_after_filter }} matches.</p>
+{% endif %}
+{% if not report.matches %}
+<div class="empty">{{ "No matches in this run." if not (spec.sites or spec.keyword) else "No matches fit these filters." }}</div>
+{% elif spec.layout == "table" %}
+<table>
+  <thead><tr><th>Title</th><th>Portal</th><th>Closing</th><th>Keywords</th></tr></thead>
+  <tbody>
+{% for m in report.matches %}
+    <tr>
+      <td><a href="{{ m.url|safe_url }}">{{ m.title }}</a>{% if m.needs_review %} <span class="chip">needs review</span>{% endif %}</td>
+      <td>{{ m.site|portal_name }}</td>
+      <td>{{ m.closing_date or "not read yet" }}</td>
+      <td>{% if m.score is not none %}Jev {{ "%.2f"|format(m.score) }}{% else %}{% for h in m.hits %}{{ h.keyword }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}</td>
+    </tr>
+{% endfor %}
+  </tbody>
+</table>
+{% else %}
+{% for m in report.matches %}
+<div class="card">
+  <h3><a href="{{ m.url|safe_url }}">{{ m.title }}</a></h3>
+  <p class="meta">{{ m.site|portal_name }}{% if m.account %} &middot; {{ m.account }}{% endif %}{% if m.posted_date %} &middot; posted {{ m.posted_date }}{% elif m.listed_date %} &middot; listed {{ m.listed_date }}{% endif %}</p>
+  <div class="chips">
+{% if m.score is not none %}
+    <span class="chip">Jev score {{ "%.2f"|format(m.score) }}</span>
+{% endif %}
+{% if m.needs_review %}
+    <span class="chip">needs review</span>
+{% endif %}
+{% for h in m.hits %}
+    <span class="chip">{{ h.keyword }}{% if h.count > 1 %} &times;{{ h.count }}{% endif %}</span>
+{% endfor %}
+  </div>
+  <div class="facts">
+{% if m.closing_date %}<div><span>Closing</span> {{ m.closing_date }}</div>{% endif %}
+{% if m.solicitation_number %}<div><span>Solicitation</span> {{ m.solicitation_number }}</div>{% endif %}
+{% if m.department %}<div><span>Department</span> {{ m.department }}</div>{% endif %}
+{% if m.supply_arrangement and m.supply_arrangement != "N/A" %}<div><span>Supply arrangement</span> {{ m.supply_arrangement }}</div>{% endif %}
+  </div>
+{% if spec.show_summaries and m.summary %}
+  <p class="summary">{{ m.summary }}</p>
+{% endif %}
+{% if spec.show_summaries and m.how_to_apply %}
+  <p class="summary"><span class="meta">How to apply:</span> {{ m.how_to_apply }}</p>
+{% endif %}
+{% if spec.show_keyword_hits %}
+{% for h in m.hits[:2] %}
+  <p class="snip">{{ h.snippet|highlight(h.keyword) }}</p>
+{% endfor %}
+{% endif %}
+{% if m.review_note %}
+  <p class="review">{{ m.review_note }}</p>
+{% endif %}
+</div>
+{% endfor %}
+{% endif %}
+
+{% elif section == "near_misses" %}
+<h2>Closest rejections</h2>
+{% if data.near_miss_note %}
+<div class="note">{{ data.near_miss_note }}</div>
+{% elif not data.near_misses %}
+<div class="empty">No rejected postings with a score in this run.</div>
+{% else %}
+<p class="note">Rejected postings with the highest scores. A score of {{ data.match_threshold }} or more is a match, {{ data.review_threshold }} up to that is a match flagged "needs review"; everything shown here scored below {{ data.review_threshold }}.</p>
+<table>
+  <thead><tr><th>Title</th><th>Portal</th><th>Listed</th><th class="num">Score</th></tr></thead>
+  <tbody>
+{% for n in data.near_misses %}
+    <tr><td><a href="{{ n.url|safe_url }}">{{ n.title }}</a></td><td>{{ n.site|portal_name }}</td><td class="nowrap">{{ n.listed_date or "" }}</td><td class="num">{{ "%.2f"|format(n.score) }}</td></tr>
+{% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endif %}
+{% endfor %}
+</body>
+</html>

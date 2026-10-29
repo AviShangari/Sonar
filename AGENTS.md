@@ -46,6 +46,7 @@ src/sonar/
   budget.py        cost caps for one run (counts and dollars)
   agent_runner.py  the ONLY place agents (the model loop) and the browser-use CLI are run
   hermes_runner.py the ONLY place the Hermes server is started and stopped (preflight, whitelisted environment, cost)
+  assistant/       terminal Q&A over stored reports (`python -m sonar.assistant`): six read-only tools (one reads stored posting text in chunks), read-only database, no browser/shell/send/scan; tool results are wrapped as untrusted data (safe.py)
 hermes_plugins/    sonar_guard: the Hermes guard plugin (copied into Hermes's home each run)
   navigation/      base.py (interface), dom.py, hermes.py (Hermes collector for dom.py), vision.py, tools.py (browser(code) tool), code_check.py (validates agent code), guards.py (browser request guards), session.py
   extraction/      posting text extraction
@@ -119,7 +120,7 @@ Create folders and files as the build reaches them. Do not scaffold empty placeh
 
 ## Agent context
 
-Runtime agents are plain OpenRouter requests, so nothing from the repo, `CLAUDE.md`, skills or `~/.claude/` can reach them. Keep it that way: a request holds only our system prompt, the task, and (browsing agent only) the one `browser` tool. Keep tests that check this (`tests/test_llm.py`, `tests/test_agent_loop.py`).
+Runtime agents are plain OpenRouter requests, so nothing from the repo, `CLAUDE.md`, skills or `~/.claude/` can reach them. Keep it that way: a request holds only our system prompt, the task, and (browsing agent only) the one `browser` tool. Keep tests that check this (`tests/test_llm.py`, `tests/test_agent_loop.py`). One exception, by the developer's decision (2026-10-29): the terminal assistant (`assistant/`) also gets six read-only database tools, one of which, `read_posting_text`, returns stored posting text in chunks. Its tool results are cleaned and wrapped as untrusted data, it has no browser, shell, send, scan or login tool, and `tests/test_assistant_safety.py` checks all of this. Do not widen its tools without asking.
 
 ## Auth and models
 

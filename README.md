@@ -46,11 +46,19 @@ A cheap first test: `uv run python -m sonar.main --site canadabuys --days 1 --ma
 
 A real run uses AI models and **costs money** (it is billed to the OpenRouter key). `max_run_usd` in `config/settings.yaml` stops a run at that dollar amount. Only one run can go at a time; a second one exits with code 2 and emails `[RUN SKIPPED]`.
 
+## Ask questions about the stored reports
+
+```bash
+uv run python -m sonar.assistant
+```
+
+A terminal chat with an assistant that answers questions about what Sonar has stored: recent matches, closing dates, why a posting matched, what a posting says, and how the last run went. It only reads the database (opened read-only); it cannot scan, log in, send email or start a run. It uses `assistant_model` and **costs a little per question** (the session cost is shown when you leave). Commands: `/reset` starts a new conversation, `/help`, `/quit`.
+
 ## Settings
 
 | File | What it holds |
 | --- | --- |
-| `config/settings.yaml` | Mode flags, models and limits: `navigation_model`, `summary_model`, `navigator`, `matcher` (`keywords` or `jev`), `headless`, cost caps, email addresses and mail server. Every setting is explained in the comments at the top of the file. |
+| `config/settings.yaml` | Mode flags, models and limits: `navigation_model`, `summary_model`, `assistant_model`, `navigator`, `matcher` (`keywords` or `jev`), `headless`, cost caps, email addresses and mail server. Every setting is explained in the comments at the top of the file. |
 | `config/sites.yaml` | The sites to scan: start address, whether a login is needed, allowed hosts. |
 | `config/keywords.yaml` | The client's keywords for the keyword matcher. |
 | `config/company.yaml` | What the client does; the text of Jev's yes/no question. |

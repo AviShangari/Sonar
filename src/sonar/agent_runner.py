@@ -138,6 +138,19 @@ async def run_text_agent(system_prompt: str, task: str, max_turns: int = 2, time
     return await run_agent("summary", system_prompt, task, None, no_tools, max_turns, timeout_s)
 
 
+async def run_assistant_turn(
+    messages: list[dict[str, Any]], tools: list[dict[str, Any]], run_tool: ToolRunner,
+    max_turns: int = 6, timeout_s: int = 120,
+) -> str:
+    """One question of the terminal assistant. `messages` is the whole conversation so far, ending with the
+    question; the model's replies and tool results are appended to it. Raises AgentError on any failure."""
+    try:
+        async with asyncio.timeout(timeout_s):
+            return await converse("assistant", messages, tools, run_tool, max_turns)
+    except TimeoutError as exc:
+        raise AgentError(f"the assistant took longer than {timeout_s}s") from exc
+
+
 async def run_agent(
     role: Role, system_prompt: str, task: str, tools: list[dict[str, Any]] | None, run_tool: ToolRunner,
     max_turns: int, timeout_s: int,

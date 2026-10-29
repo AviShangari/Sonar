@@ -154,9 +154,9 @@ def test_run_notes_from_the_database_are_cleaned_too(tools) -> None:
 # ---- the model has no way to act --------------------------------------------------------------------
 
 
-def test_the_assistant_has_only_the_six_read_only_tools() -> None:
+def test_the_assistant_has_only_the_read_only_tools_and_the_pdf_maker() -> None:
     names = [t["function"]["name"] for t in TOOL_SCHEMAS]
-    assert names == TOOL_NAMES and len(names) == 6
+    assert names == TOOL_NAMES and len(names) == 8
     banned = ("browser", "bash", "shell", "exec", "send", "email", "scan", "start", "login", "write", "delete", "update")
     assert not [n for n in names if any(word in n for word in banned)]
     for tool in TOOL_SCHEMAS:  # no free-text code or command parameter anywhere
@@ -185,11 +185,13 @@ def test_arguments_cannot_inject_sql(tools) -> None:
 def test_a_tool_never_changes_the_database(tools) -> None:
     before = run_tool(tools, "last_run_status")
     for name in TOOL_NAMES:
+        if name == "make_pdf":  # writes a PDF file, never the database; covered in test_pdf.py
+            continue
         run_tool(tools, name, **({"listing_id": 1} if name in ("get_posting", "explain_match") else {}))
     assert run_tool(tools, "last_run_status") == before
 
 
-def test_the_model_request_holds_only_the_system_prompt_the_conversation_and_six_tools(tools, monkeypatch) -> None:
+def test_the_model_request_holds_only_the_system_prompt_the_conversation_and_the_tools(tools, monkeypatch) -> None:
     script = Script(monkeypatch, answer("Hello."))
     asyncio.run(Assistant(tools, ["canadabuys"]).ask("hi"))
     request = script.requests[0]

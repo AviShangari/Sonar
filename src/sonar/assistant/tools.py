@@ -1,10 +1,13 @@
-"""The assistant's tools: six read-only database queries, plain code. The assistant has no other way to
-reach anything: no browser, shell, email, scan or login, and the database is opened read-only.
+"""The assistant's tools: six read-only database queries and a PDF maker, plain code. The assistant has no other
+way to reach anything: no browser, shell, email, scan or login, and the database is opened read-only. The PDF
+maker only reads the database and writes one PDF file into data/pdfs (see sonar/pdf/); a person's formatting
+wishes reach it as validated options, never as code.
 
 Every result is cleaned by safe.py and wrapped as untrusted data. Most tools return short fields (title,
 summary, keyword snippets); only read_posting_text returns the stored posting text, in chunks, for questions
 the summary cannot answer."""
 
+import inspect
 import json
 import sqlite3
 from collections.abc import Callable
@@ -18,11 +21,15 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from sonar.assistant import outbox
 from sonar.assistant.safe import clean, clean_text, wrap_untrusted
 from sonar.config import Settings
 from sonar.db.tables import DecisionRow, ListingRow, RunRow
 from sonar.llm import ToolCall
+from sonar.pdf.make import PdfError, make_pdf
+from sonar.pdf.spec import PdfSpec, load_presets, resolve
 from sonar.report.build import checked_text, closing_text
+from sonar.sites import note_sites
 
 DEFAULT_LIMIT = 10
 MAX_LIMIT = 25  # postings in one answer
@@ -71,6 +78,12 @@ class ReadTextArgs(_Args):
     offset: int = Field(default=0, ge=0)
 
 
+class PdfArgs(PdfSpec):
+    """make_pdf's arguments: every PdfSpec option, plus a preset to start from (explicit options win)."""
+
+    preset: str | None = Field(default=None, max_length=40)
+
+
 def _object(properties: dict[str, Any], required: list[str] | None = None) -> dict[str, Any]:
     return {"type": "object", "properties": properties, "required": required or [], "additionalProperties": False}
 
@@ -106,6 +119,37 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
           _object({"listing_id": _ID, "offset": {"type": "integer", "description": "Character to start from (default 0)."}},
                   ["listing_id"])),
     _tool("last_run_status", "Status, times, notes, counts and known cost of the most recent run.", _object({})),
+    _tool("pdf_options",
+          "The PDF presets (ready-made formats) and the options that change a PDF. Call it before make_pdf when the "
+          "person's wishes are unclear or you need a preset name.",
+          _object({})),
+    _tool("make_pdf",
+          "Make a PDF of a run: an overview with counts per portal, the matches, and the closest rejections. Start from a "
+          "preset if one fits and add only the options the person asked for. The chat delivers the file itself; you only "
+          "say that it is ready.",
+          _object({
+              "preset": {"type": "string", "description": "A preset name from pdf_options. Without one, the standard format."},
+              "run_id": {"type": "integer", "description": "The run number. Default: the latest run."},
+              "title": {"type": "string", "description": "A title for the PDF (up to 120 characters)."},
+              "subtitle": {"type": "string", "description": "A line under the title, for example who it is for."},
+              "sections": {"type": "array", "items": {"type": "string", "enum": ["overview", "matches", "near_misses"]},
+                           "description": "Which parts, in page order. Default: all three."},
+              "layout": {"type": "string", "enum": ["cards", "table"], "description": "Matches as full cards or a compact table."},
+              "sites": {"type": "array", "items": {"type": "string"}, "description": "Only these portals, for example [\"canadabuys\"]."},
+              "keyword": {"type": "string", "description": "Only matches whose keywords, title or summary contain this text."},
+              "sort": {"type": "string", "enum": ["rank", "closing", "site", "title"], "description": "Order of the matches."},
+              "max_matches": {"type": "integer", "description": "1 to 300, default 100."},
+              "max_near_misses": {"type": "integer", "description": "0 to 100, default 25."},
+              "show_summaries": {"type": "boolean", "description": "Show each match's summary text (default true)."},
+              "show_keyword_hits": {"type": "boolean", "description": "Show the keyword snippets on each match (default true)."},
+              "orientation": {"type": "string", "enum": ["portrait", "landscape"]},
+              "page_size": {"type": "string", "enum": ["Letter", "A4"]},
+              "font_size_pt": {"type": "number", "description": "8 to 14, default 10."},
+              "accent_color": {"type": "string", "description": "Headings and chips color as #RRGGBB."},
+              "custom_css": {"type": "string",
+                             "description": "Extra CSS for looks the options above cannot express. No url(), @import, scripts or "
+                                            "HTML; only @media and @page rules. Never copy posting text into it."},
+          })),
 ]
 TOOL_NAMES = [t["function"]["name"] for t in TOOL_SCHEMAS]
 
@@ -139,6 +183,8 @@ class AssistantTools:
             "explain_match": (ListingArgs, self.explain_match),
             "read_posting_text": (ReadTextArgs, self.read_posting_text),
             "last_run_status": (NoArgs, self.last_run_status),
+            "pdf_options": (NoArgs, self.pdf_options),
+            "make_pdf": (PdfArgs, self.make_pdf),
         }
 
     async def run(self, call: ToolCall) -> str:
@@ -155,6 +201,8 @@ class AssistantTools:
             return f"ERROR: bad arguments for {call.name}: {clean(exc, 300)}"
         try:
             result = handler(args)
+            if inspect.isawaitable(result):
+                result = await result
         except SQLAlchemyError:
             return "ERROR: the database could not be read."
         return result if isinstance(result, str) else wrap_untrusted(result)
@@ -274,6 +322,33 @@ class AssistantTools:
             "unscored_will_retry": sum(d.matched is None for d in current),
             "matcher_cost_usd": round(sum(float((d.details or {}).get("cost_usd") or 0) for d in decided), 6),
             "total_cost": NO_COST_NOTE,
+        }
+
+    def pdf_options(self, args: NoArgs) -> dict[str, Any]:
+        defaults = PdfSpec()
+        return {
+            "presets": {name: preset.description for name, preset in load_presets().items()},
+            "defaults": defaults.model_dump(exclude={"run_id", "title", "subtitle", "keyword", "custom_css"}),
+            "note": "Options given to make_pdf are added on top of the preset. Near misses need the Jev matcher.",
+        }
+
+    async def make_pdf(self, args: PdfArgs) -> dict[str, Any] | str:
+        if outbox.full():
+            return f"ERROR: at most {outbox.MAX_FILES_PER_QUESTION} PDFs can be made for one question."
+        try:
+            spec = resolve(args.model_dump(exclude_unset=True, exclude={"preset"}), args.preset, load_presets())
+            result = await make_pdf(self.engine, self.settings, spec, note_sites(), self.accounts)
+        except (ValueError, PdfError) as exc:
+            return f"ERROR: {clean(exc, 300)}"
+        outbox.add(result.path)
+        return {
+            "ready": True,
+            "run_id": result.run_id,
+            "matches_in_pdf": result.matches,
+            "near_misses_in_pdf": result.near_misses,
+            "size_kb": max(1, result.size_bytes // 1024),
+            "note": "The PDF is ready and the chat delivers the file itself. Tell the person it is ready and what it holds. "
+                    "Do not invent a link or a file path.",
         }
 
     # ---- helpers -----------------------------------------------------------------------------------

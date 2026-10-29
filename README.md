@@ -23,6 +23,7 @@ Then create a file named `.env` in the repo root. It is gitignored and is the on
 | `SONAR_SMTP_PASSWORD` | Sending the email report (a Gmail app password for the default settings) |
 | `OPENROUTER_API_KEY` | Every model call: the browsing agent, the summaries and the `jev` matcher |
 | `SONAR_<SITE>_USERNAME` / `SONAR_<SITE>_PASSWORD` | Each site that needs a login. `<SITE>` is the site name in capitals: `SONAR_ONTARIOTENDERS_*`, `SONAR_ARIBA_*`, `SONAR_ARIBA2_*`. CanadaBuys needs none. |
+| `TEAMS_APP_ID` / `TEAMS_APP_PASSWORD` / `TEAMS_TENANT_ID` | The Teams bot only: the Azure Bot's Microsoft App ID, its client secret, and the company's tenant ID |
 
 There is no Claude-login mode: the agents always use the OpenRouter key, so the key is required for any run.
 
@@ -52,7 +53,45 @@ A real run uses AI models and **costs money** (it is billed to the OpenRouter ke
 uv run python -m sonar.assistant
 ```
 
-A terminal chat with an assistant that answers questions about what Sonar has stored: recent matches, closing dates, why a posting matched, what a posting says, and how the last run went. It only reads the database (opened read-only); it cannot scan, log in, send email or start a run. It uses `assistant_model` and **costs a little per question** (the session cost is shown when you leave). Commands: `/reset` starts a new conversation, `/help`, `/quit`.
+A terminal chat with an assistant that answers questions about what Sonar has stored (and makes PDFs of it, see below): recent matches, closing dates, why a posting matched, what a posting says, and how the last run went. It only reads the database (opened read-only); it cannot scan, log in, send email or start a run. It uses `assistant_model` and **costs a little per question** (the session cost is shown when you leave). Commands: `/reset` starts a new conversation, `/help`, `/quit`.
+
+## PDF reports
+
+Ask the assistant (in the terminal or in Teams) for a PDF: "a PDF of the last run", "a brief with only the CanadaBuys matches, soonest closing first", "the full report in landscape with bigger text". A PDF has an overview (counts per portal, matched, rejected, not scored), the matches (as cards or a compact table) and the closest rejections (the highest-scoring postings the matcher rejected; this needs the Jev matcher, which gives every posting a score).
+
+How it can be changed, in the order of how much a person needs to know:
+- **Presets** in `config/pdf.yaml` (`standard`, `brief`, `full`, `closing-soon`). Add your own there.
+- **Options** the assistant sets from the request: sections and their order, cards or table, portals, a keyword, sort, how many, summaries and keyword snippets on or off, portrait or landscape, Letter or A4, font size, color, title and subtitle.
+- **Extra styling** (`custom_css`) for looks the options cannot express. It may restyle the page but not fetch anything: `url()`, `@import`, scripts and HTML are refused.
+- **The base template** `src/sonar/pdf/templates/run_pdf.html`, for a developer who wants a different layout for everyone.
+
+The terminal chat prints `PDF saved: <path>` (files are in `data/pdfs/`). In Teams, a one-to-one chat gets a "file" card to click Allow on; channels and group chats cannot receive files from a bot, so Sonar says so. To make one without the assistant: `uv run python -m sonar.pdf.make --run 5 --preset brief`. Making a PDF costs nothing (no model is involved in the PDF itself, only in understanding the request). It needs the Chromium that `playwright install chromium` provides.
+
+## Ask questions in Microsoft Teams
+
+The same assistant, in Teams: chat with Sonar one to one, or `@Sonar` in a channel or group chat. It is read-only like the terminal chat and costs a little per question. Settings are in `config/teams.yaml`; the three `TEAMS_*` values go in `.env`.
+
+Teams sends each message over the internet to the bot, so while the bot runs on this computer a **Dev Tunnel** (Microsoft's free tunnel tool, `winget install Microsoft.devtunnel`) gives it a public https address.
+
+Once:
+
+```bash
+uv run python -m sonar.teams.package        # writes data/teams/sonar-teams-<version>.zip
+devtunnel user login                        # sign in (company account; or -g for GitHub)
+devtunnel create sonar-bot -a               # -a: Teams must be able to reach it; the bot checks every request itself
+devtunnel port create sonar-bot -p 3978
+```
+
+Then, in the Azure portal, set the Azure Bot's **Messaging endpoint** to the tunnel's address plus `/api/messages` (for example `https://sonar-bot-3978.usw2.devtunnels.ms/api/messages`; `devtunnel host` prints the address). In Teams: **Apps > Manage your apps > Upload an app**, choose the zip, and add it to a chat or team.
+
+Each time:
+
+```bash
+devtunnel host sonar-bot                    # terminal 1: keep it open
+uv run python -m sonar.teams                # terminal 2: the bot (Ctrl-C to stop)
+```
+
+Type `help` or `reset` to Sonar. `allowed_users` in `config/teams.yaml` limits who may ask (empty = anyone in the company); someone not on it gets a short refusal and their ID is printed in the bot's log. After changing `config/teams.yaml`'s app text, raise `app_version`, rebuild the package and upload it again.
 
 ## Settings
 
@@ -62,6 +101,8 @@ A terminal chat with an assistant that answers questions about what Sonar has st
 | `config/sites.yaml` | The sites to scan: start address, whether a login is needed, allowed hosts. |
 | `config/keywords.yaml` | The client's keywords for the keyword matcher. |
 | `config/company.yaml` | What the client does; the text of Jev's yes/no question. |
+| `config/teams.yaml` | The Teams bot: where it listens, who may ask, and the app text Teams shows. |
+| `config/pdf.yaml` | The PDF presets (named starting points for the PDFs the assistant makes). |
 
 `email: true` must stay on. To try a report without sending it, use `send_report.py --dry-run` (below).
 

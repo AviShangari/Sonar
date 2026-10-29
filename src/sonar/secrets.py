@@ -30,6 +30,14 @@ def openrouter_api_key() -> str:
     return _secret(OPENROUTER_KEY_VAR, "running any model")
 
 
+def teams_credentials() -> tuple[str, str, str]:
+    """(app id, client secret, tenant id) of the Azure Bot that connects Sonar to Microsoft Teams."""
+    needed_for = "starting the Teams bot"
+    return (
+        _secret("TEAMS_APP_ID", needed_for), _secret("TEAMS_APP_PASSWORD", needed_for), _secret("TEAMS_TENANT_ID", needed_for),
+    )
+
+
 def site_credentials(site_name: str) -> tuple[str, str]:
     """(username, password) for a site that needs a login, from SONAR_<SITE>_USERNAME and
     SONAR_<SITE>_PASSWORD (site name in capitals, for example SONAR_ONTARIOTENDERS_USERNAME)."""

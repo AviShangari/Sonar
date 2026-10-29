@@ -2,7 +2,7 @@
 #   All model calls go to OpenRouter. The key goes in the gitignored .env as OPENROUTER_API_KEY, never here (read only by secrets.py)
 #   navigation_model / navigation_effort: model and reasoning effort of the browsing agent
 #   summary_model: model that writes the summaries
-#   assistant_model: model of the terminal assistant (python -m sonar.assistant) that answers questions about stored reports
+#   assistant_model: model of the assistant that answers questions about stored reports (terminal: python -m sonar.assistant; Teams: python -m sonar.teams)
 #   navigator:     hermes (Hermes Agent reads the list pages; see config/hermes.yaml), dom (the older in-house agent, fallback) or vision (not built yet)
 #   matcher:       keywords or jev. Jev needs the text in company_file (it uses the same OPENROUTER_API_KEY).
 #                  Switching to jev scores EVERY stored listing that has no Jev decision yet (a backfill), and retries any Jev could not score.
@@ -19,6 +19,7 @@
 #   report_dir:    where each run's report files (.html and .txt) are written
 #   screenshot_dir: where a screenshot is saved when navigation fails (inside data/, never committed)
 #   route_notes_dir: where the agent's note on how it reached each site's list is kept (one line per change; inside data/, never committed)
+#   pdf_dir:       where the PDFs made on request are written (inside data/, never committed); presets are in config/pdf.yaml
 #   summaries:     true: a model writes a short summary for each match
 #   summary_workers: how many summary agents run at the same time (each is a separate process)
 #   max_agent_calls / max_new_per_site / max_summaries: cost caps per run (all agent calls; new postings per site; summaries).
@@ -50,6 +51,7 @@ cdp_port: 9333
 report_dir: data/reports
 screenshot_dir: data/screenshots
 route_notes_dir: data/route-notes
+pdf_dir: data/pdfs
 summaries: true
 summary_workers: 3
 max_agent_calls:

@@ -7,6 +7,7 @@ own model, pinned in config/settings.yaml:
 
   navigation  the browsing agent (model and reasoning effort)
   summary     the summary writer (model only)
+  assistant   the terminal Q&A assistant (model only)
 """
 
 import asyncio
@@ -21,7 +22,7 @@ from sonar.secrets import openrouter_api_key
 
 log = logging.getLogger("sonar.llm")
 
-Role = Literal["navigation", "summary"]
+Role = Literal["navigation", "summary", "assistant"]
 
 CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_KEY_URL = "https://openrouter.ai/api/v1/key"  # read-only: how much this key has spent
@@ -66,7 +67,9 @@ def configure(settings: Settings) -> None:
 
 
 def model_for(role: Role) -> str:
-    return _settings.navigation_model if role == "navigation" else _settings.summary_model
+    return {
+        "navigation": _settings.navigation_model, "summary": _settings.summary_model, "assistant": _settings.assistant_model,
+    }[role]
 
 
 def request_body(role: Role, messages: list[dict[str, Any]], tools: list[dict[str, Any]] | None) -> dict[str, Any]:

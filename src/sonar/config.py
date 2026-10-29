@@ -17,6 +17,7 @@ class Settings(BaseModel):
     navigation_model: str = "openai/gpt-6.1-sol"  # the browsing agent's model (OpenRouter name; see llm.py)
     navigation_effort: Literal["low", "medium", "high", "xhigh", "max"] | None = "medium"
     summary_model: str = "anthropic/claude-sonnet-5.5"  # the summary writer's model
+    assistant_model: str = "openai/gpt-6.1-sol"  # the terminal assistant that answers questions about stored reports
     navigator: Literal["dom", "vision", "hermes"] = "hermes"
     matcher: Literal["keywords", "jev"] = "jev"
     database_url: str = "sqlite:///data/sonar.db"

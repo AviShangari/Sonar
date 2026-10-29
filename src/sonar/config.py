@@ -132,8 +132,15 @@ class HermesSettings(BaseModel):
         return Path(os.path.expandvars(self.executable))
 
 
+HERMES_PATH_OVERRIDES = {"home": "SONAR_HERMES_HOME", "install_dir": "SONAR_HERMES_INSTALL_DIR", "executable": "SONAR_HERMES_EXECUTABLE"}
+
+
 def load_hermes_settings(path: Path = HERMES_PATH) -> HermesSettings:
-    return HermesSettings(**yaml.safe_load(path.read_text(encoding="utf-8")))
+    values = yaml.safe_load(path.read_text(encoding="utf-8"))
+    for key, name in HERMES_PATH_OVERRIDES.items():
+        if os.environ.get(name):
+            values[key] = os.environ[name]  # the Docker image sets these: hermes.yaml holds the laptop's Windows paths
+    return HermesSettings(**values)
 
 
 TEAMS_PATH = ROOT / "config" / "teams.yaml"

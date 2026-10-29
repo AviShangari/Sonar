@@ -140,10 +140,12 @@ The image is how Sonar will be deployed. It runs headless as a non-root user.
 
 ```bash
 docker build -t sonar .
-docker run --rm --shm-size=1g --env-file .env -v ./config:/app/config:ro -v ./data:/app/data sonar
+docker run --rm --shm-size=1g --env-file .env -v ./config:/app/config:ro -v ./data:/app/data -v sonar-hermes-home:/opt/hermes/home sonar
 ```
 
 This runs all the sites. You can add the same options as above after `sonar` (for example `--max-new 3` for a test). `--env-file .env` supplies `OPENROUTER_API_KEY`. Never publish the browser's debug port.
+
+The image also contains Hermes Agent (v0.22.4, installed by its own installer, pinned to the tested commit), so `navigator: hermes` works with your normal `config/`. The Windows folder paths in `config/hermes.yaml` are replaced inside the container by the `SONAR_HERMES_HOME`, `SONAR_HERMES_INSTALL_DIR` and `SONAR_HERMES_EXECUTABLE` variables, which the image sets. The `sonar-hermes-home` volume keeps Hermes's saved notes between runs (Docker fills it from the image the first time). The image is large (about 7 GB) and the first build takes around 10 minutes.
 
 ## Safety
 

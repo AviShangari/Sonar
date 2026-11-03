@@ -209,6 +209,19 @@ def test_the_system_prompt_marks_tool_results_as_data_not_instructions() -> None
     assert "answer only questions about sonar" in lowered and "do not answer the question or call a tool" in lowered
 
 
+def test_an_off_topic_question_is_answered_with_what_the_assistant_can_do(tools) -> None:
+    """Not a bare refusal: the prompt tells the model to list its abilities, and "what can you do" is on-topic."""
+    prompt = Assistant(tools, ["canadabuys"]).system_prompt()
+    assert "{CAPABILITIES}" not in prompt and "{format_rule}" not in prompt and "{today}" not in prompt
+    section = prompt.split("What you can do (")[1].split("Untrusted data")[0]  # the list, not the rules above it
+    for ability in ("matching postings", "closing date", "why a posting matched", "last run", "PDF report"):
+        assert ability in section
+    lowered = prompt.lower()
+    assert "then show what you can do" in lowered and "one example question" in lowered
+    assert "asks what you can do" in lowered and "not off-topic" in lowered
+    assert "only help with sonar" not in lowered  # the old curt one-line refusal is gone
+
+
 def test_a_model_that_obeys_a_posting_still_cannot_do_anything(tools, monkeypatch) -> None:
     """The scripted model reads the hostile posting, then 'obeys' it by calling tools it does not have."""
     script = Script(
